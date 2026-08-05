@@ -1,14 +1,13 @@
 'use client';
 
 import React from 'react';
-import { Calendar, Users, Send, Cloud, Trash2, CheckCircle2, Sun, Moon } from 'lucide-react';
+import { Calendar, Users, Send, Trash2, CheckCircle2, Sun, Moon } from 'lucide-react';
 
 interface NavbarProps {
   currentDate: string;
   onDateChange: (date: string) => void;
   onOpenEmailModal: () => void;
   onOpenRosterModal: () => void;
-  onOpenDeployModal: () => void;
   onResetData: () => void;
   isSaved: boolean;
   theme: 'dark' | 'light';
@@ -20,7 +19,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onDateChange,
   onOpenEmailModal,
   onOpenRosterModal,
-  onOpenDeployModal,
   onResetData,
   isSaved,
   theme,
@@ -124,19 +122,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Users className="w-3.5 h-3.5 text-blue-500" />
             <span>Roster</span>
-          </button>
-
-          <button
-            onClick={onOpenDeployModal}
-            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border transition-all ${
-              isDark
-                ? 'bg-slate-800/60 hover:bg-slate-800 text-slate-300 border-slate-700/60'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-            }`}
-            title="Deploy Live for Free (Supabase/Vercel)"
-          >
-            <Cloud className="w-3.5 h-3.5 text-purple-500" />
-            <span>Live Sync</span>
           </button>
 
           <button

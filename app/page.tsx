@@ -267,7 +267,6 @@ export default function DashboardPage() {
         onDateChange={handleDateChange}
         onOpenEmailModal={() => setIsEmailModalOpen(true)}
         onOpenRosterModal={() => setIsRosterModalOpen(true)}
-        onOpenDeployModal={() => setIsDeployModalOpen(true)}
         onResetData={handleResetData}
         isSaved={isSaved}
         theme={theme}
