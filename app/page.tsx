@@ -242,9 +242,22 @@ export default function DashboardPage() {
     updateMOM({ ...momData, smokeRows: updatedRows });
   };
 
+  // CLEAR FORM ONLY CLEARS QA TASKS, PRESERVING THE SMOKE EXECUTION TABLE DATA!
   const handleResetData = () => {
-    if (confirm('Reset dashboard data to initial state?')) {
-      updateMOM(INITIAL_MOM_DATA);
+    if (confirm('Clear daily QA tasks for fresh entry? (Daily Smoke Report Execution Summary table data will be preserved)')) {
+      const clearedTasks = momData.qaTasks.map((entry) => ({
+        ...entry,
+        status: '',
+        tasks: [],
+        isSubmitted: false,
+        submittedAt: undefined,
+      }));
+
+      updateMOM({
+        ...momData,
+        qaTasks: clearedTasks,
+        // smokeRows remain untouched and preserved!
+      });
     }
   };
 

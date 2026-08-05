@@ -2,8 +2,8 @@
   "2026-08-05": {
     "id": "2026-08-05",
     "dateFormatted": "05-August-2026",
-    "createdAt": "2026-08-05T11:14:02.674Z",
-    "updatedAt": "2026-08-05T11:56:41.928Z",
+    "createdAt": "2026-08-05T12:04:26.545Z",
+    "updatedAt": "2026-08-05T12:04:31.850Z",
     "attendees": [
       "Rakhi Das",
       "Indranil Suin",
@@ -13,17 +13,16 @@
       "Ajay NR",
       "Tushar Joshi"
     ],
-    "senderName": "RAKHI DAS",
-    "senderTitle": "Executive || Quality Assurance",
+    "senderName": "",
+    "senderTitle": "",
     "qaTasks": [
       {
         "qaId": "5",
         "qaName": "Rakhi Das",
         "isOnLeave": false,
-        "isSubmitted": true,
-        "status": "working on Buyer my Launch",
-        "tasks": [],
-        "submittedAt": "17:26"
+        "isSubmitted": false,
+        "status": "",
+        "tasks": []
       },
       {
         "qaId": "7",
