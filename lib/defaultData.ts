@@ -38,8 +38,8 @@ export const INITIAL_MOM_DATA: DailyMOM = {
     'Ajay NR',
     'Tushar Joshi',
   ],
-  senderName: 'RAKHI DAS',
-  senderTitle: 'Executive || Quality Assurance',
+  senderName: '',
+  senderTitle: '',
   qaTasks: [
     { qaId: '5', qaName: 'Rakhi Das', isOnLeave: false, isSubmitted: false, status: '', tasks: [] },
     { qaId: '7', qaName: 'Indranil Suin', isOnLeave: false, isSubmitted: false, status: '', tasks: [] },

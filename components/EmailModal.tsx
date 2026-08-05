@@ -26,18 +26,14 @@ export const EmailModal: React.FC<EmailModalProps> = ({
   const [copiedHtml, setCopiedHtml] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
 
-  // Email Configuration state
+  // Email Configuration state (All start completely blank by default)
   const [showConfig, setShowConfig] = useState(true);
-  const [toEmails, setToEmails] = useState(mom.emailSettings?.toEmails || 'sukanya@company.com');
-  const [ccEmails, setCcEmails] = useState(mom.emailSettings?.ccEmails || 'qa-team@company.com');
+  const [toEmails, setToEmails] = useState(mom.emailSettings?.toEmails || '');
+  const [ccEmails, setCcEmails] = useState(mom.emailSettings?.ccEmails || '');
   const [bccEmails, setBccEmails] = useState(mom.emailSettings?.bccEmails || '');
-  const [fromEmail, setFromEmail] = useState(mom.emailSettings?.fromEmail || 'rakhi.das@company.com');
+  const [fromEmail, setFromEmail] = useState(mom.emailSettings?.fromEmail || '');
   const [smtpUser, setSmtpUser] = useState(mom.emailSettings?.smtpUser || '');
   const [smtpPass, setSmtpPass] = useState(mom.emailSettings?.smtpPass || '');
-
-  // Direct sending state
-  const [isSending, setIsSending] = useState(false);
-  const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null);
 
   if (!isOpen) return null;
 
@@ -104,6 +100,9 @@ export const EmailModal: React.FC<EmailModalProps> = ({
   };
 
   // Direct Send via server SMTP
+  const [isSending, setIsSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null);
+
   const handleDirectSend = async () => {
     saveSettings();
     setIsSending(true);
@@ -207,7 +206,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5" /> Configure Recipients & Sender Account
               </span>
-              <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Values are saved automatically</span>
+              <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Values saved automatically</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -217,7 +216,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({
                   type="text"
                   value={toEmails}
                   onChange={(e) => setToEmails(e.target.value)}
-                  placeholder="sukanya@company.com, manager@company.com"
+                  placeholder="e.g. sukanya@company.com"
                   className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-emerald-500 ${
                     isDark
                       ? 'bg-slate-900 border-slate-700 text-white'
@@ -232,7 +231,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({
                   type="text"
                   value={ccEmails}
                   onChange={(e) => setCcEmails(e.target.value)}
-                  placeholder="qa-team@company.com"
+                  placeholder="e.g. qa-team@company.com"
                   className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-emerald-500 ${
                     isDark
                       ? 'bg-slate-900 border-slate-700 text-white'
@@ -247,7 +246,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({
                   type="text"
                   value={bccEmails}
                   onChange={(e) => setBccEmails(e.target.value)}
-                  placeholder="archive@company.com"
+                  placeholder="e.g. archive@company.com"
                   className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-emerald-500 ${
                     isDark
                       ? 'bg-slate-900 border-slate-700 text-white'
@@ -266,7 +265,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({
                   type="text"
                   value={mom.senderName || ''}
                   onChange={(e) => onUpdateMOM({ senderName: e.target.value })}
-                  placeholder="RAKHI DAS"
+                  placeholder="e.g. RAKHI DAS"
                   className={`w-full border rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:border-emerald-500 ${
                     isDark
                       ? 'bg-slate-900 border-slate-700 text-white'
@@ -284,7 +283,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({
                     setSmtpUser(e.target.value);
                     setFromEmail(e.target.value);
                   }}
-                  placeholder="rakhi.das@company.com"
+                  placeholder="e.g. your.email@company.com"
                   className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-emerald-500 ${
                     isDark
                       ? 'bg-slate-900 border-slate-700 text-white'
@@ -364,7 +363,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({
           </div>
 
           <div className={`text-xs flex items-center gap-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            <span>To: <strong className="text-emerald-600 dark:text-emerald-400">{toEmails || 'Not set'}</strong></span>
+            <span>To: <strong className="text-emerald-600 dark:text-emerald-400">{toEmails || 'Blank'}</strong></span>
             {ccEmails && <span className="ml-2">CC: <strong className={isDark ? 'text-slate-300' : 'text-slate-700'}>{ccEmails}</strong></span>}
           </div>
         </div>
@@ -392,7 +391,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({
                   </span>
                 </div>
                 <div className="text-xs text-slate-500 space-y-0.5 font-mono">
-                  <p><strong>To:</strong> {toEmails}</p>
+                  <p><strong>To:</strong> {toEmails || '-'}</p>
                   {ccEmails && <p><strong>CC:</strong> {ccEmails}</p>}
                   {bccEmails && <p><strong>BCC:</strong> {bccEmails}</p>}
                 </div>
