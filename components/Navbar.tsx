@@ -12,6 +12,7 @@ interface NavbarProps {
   isSaved: boolean;
   theme: 'dark' | 'light';
   onSetTheme: (theme: 'dark' | 'light') => void;
+  allQAsSubmitted?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -23,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isSaved,
   theme,
   onSetTheme,
+  allQAsSubmitted = false,
 }) => {
   const isDark = theme === 'dark';
 
@@ -135,11 +137,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Clear Form</span>
           </button>
 
+          {/* SEND REPORT BUTTON - DISABLED UNTIL ALL QAS SUBMIT */}
           <button
+            disabled={!allQAsSubmitted}
             onClick={onOpenEmailModal}
-            className="flex items-center gap-2 text-sm font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 px-4 py-2 rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            className={`flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all duration-200 ${
+              allQAsSubmitted
+                ? 'text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer'
+                : 'bg-[#a5b4fc] text-white opacity-80 cursor-not-allowed shadow-xs'
+            }`}
+            title={
+              allQAsSubmitted
+                ? 'Preview & Send MOM Email'
+                : 'Disabled until all present QAs submit their daily standup tasks'
+            }
           >
-            <Send className="w-4 h-4 fill-slate-950" />
+            <Send className={`w-4 h-4 ${allQAsSubmitted ? 'fill-slate-950 text-slate-950' : 'text-white'}`} />
             <span>Send Report</span>
           </button>
         </div>

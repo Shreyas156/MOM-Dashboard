@@ -3,7 +3,7 @@
     "id": "2026-08-05",
     "dateFormatted": "05-August-2026",
     "createdAt": "2026-08-05T11:14:02.674Z",
-    "updatedAt": "2026-08-05T11:14:35.109Z",
+    "updatedAt": "2026-08-05T11:56:41.928Z",
     "attendees": [
       "Rakhi Das",
       "Indranil Suin",
@@ -20,9 +20,10 @@
         "qaId": "5",
         "qaName": "Rakhi Das",
         "isOnLeave": false,
-        "isSubmitted": false,
-        "status": "",
-        "tasks": []
+        "isSubmitted": true,
+        "status": "working on Buyer my Launch",
+        "tasks": [],
+        "submittedAt": "17:26"
       },
       {
         "qaId": "7",

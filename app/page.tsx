@@ -152,19 +152,23 @@ export default function DashboardPage() {
     updateMOM(newMOM);
   };
 
-  // Explicit QA Submit / Resubmit Handler (Uses 24-hour time format: HH:mm)
+  // Explicit QA Submit / Resubmit Handler (Uses 12-hour AM/PM time format)
   const handleSubmitQATask = (qaId: string) => {
     const now = new Date();
-    const hours = String(now.getHours()).padStart(2, '0');
+    let hours = now.getHours();
     const minutes = String(now.getMinutes()).padStart(2, '0');
-    const time24Str = `${hours}:${minutes}`;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // 0 becomes 12
+    const hoursStr = String(hours).padStart(2, '0');
+    const time12Str = `${hoursStr}:${minutes} ${ampm}`;
 
     const updatedTasks = momData.qaTasks.map((entry) => {
       if (entry.qaId === qaId) {
         return {
           ...entry,
           isSubmitted: true,
-          submittedAt: time24Str,
+          submittedAt: time12Str,
         };
       }
       return entry;
@@ -255,6 +259,11 @@ export default function DashboardPage() {
     saveStoredModules(newModules);
   };
 
+  // Check if ALL QAs have submitted
+  const totalQAs = momData.qaTasks.length;
+  const submittedCount = momData.qaTasks.filter((q) => q.isSubmitted || q.isOnLeave).length;
+  const allQAsSubmitted = totalQAs > 0 && submittedCount === totalQAs;
+
   const isDark = theme === 'dark';
 
   return (
@@ -271,6 +280,7 @@ export default function DashboardPage() {
         isSaved={isSaved}
         theme={theme}
         onSetTheme={handleSetTheme}
+        allQAsSubmitted={allQAsSubmitted}
       />
 
       {/* Main Container */}
@@ -296,8 +306,18 @@ export default function DashboardPage() {
           </div>
 
           <button
+            disabled={!allQAsSubmitted}
             onClick={() => setIsEmailModalOpen(true)}
-            className="flex items-center gap-2 text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-500/20 self-end md:self-auto cursor-pointer"
+            className={`text-xs font-bold px-4 py-2 rounded-xl transition-all self-end md:self-auto flex items-center gap-2 ${
+              allQAsSubmitted
+                ? 'text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow-lg shadow-emerald-500/20 cursor-pointer'
+                : 'bg-[#a5b4fc] text-white opacity-80 cursor-not-allowed shadow-xs'
+            }`}
+            title={
+              allQAsSubmitted
+                ? 'Preview & Send MOM Report'
+                : 'Disabled until all present QAs submit their standup tasks'
+            }
           >
             <span>Preview & Send MOM Report</span>
           </button>
