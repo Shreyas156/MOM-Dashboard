@@ -2,12 +2,14 @@
 
 import React, { useState } from 'react';
 import { QATaskEntry, QA } from '@/lib/types';
-import { UserCheck, UserX, Plus, Trash2, ListOrdered, ChevronDown, ChevronUp } from 'lucide-react';
+import { UserX, Plus, Trash2, ListOrdered, ChevronDown, ChevronUp, CheckCircle, Send } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 interface AttendanceSectionProps {
   qaTasks: QATaskEntry[];
   availableQAs: QA[];
   onUpdateQATask: (qaId: string, updated: Partial<QATaskEntry>) => void;
+  onSubmitQATask: (qaId: string) => void;
   onAddQAToMOM: (qa: QA) => void;
   theme?: 'dark' | 'light';
 }
@@ -16,6 +18,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
   qaTasks,
   availableQAs,
   onUpdateQATask,
+  onSubmitQATask,
   onAddQAToMOM,
   theme = 'dark',
 }) => {
@@ -56,6 +59,15 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
     onUpdateQATask(qaId, { tasks: updatedTasks });
   };
 
+  const handleSubmit = (qaId: string) => {
+    confetti({
+      particleCount: 40,
+      spread: 50,
+      origin: { y: 0.7 },
+    });
+    onSubmitQATask(qaId);
+  };
+
   // Find QAs not yet in MOM list
   const unaddedQAs = availableQAs.filter(
     (aqa) =>
@@ -80,7 +92,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
             </h2>
           </div>
           <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            QAs can fill their daily work bullets or toggle leave status with 1-click.
+            Each QA enters their work & smoke test numbers below, then clicks <strong>"Submit My Task"</strong> to confirm!
           </p>
         </div>
 
@@ -124,6 +136,10 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
                   ? isDark
                     ? 'bg-amber-950/20 border-amber-500/40'
                     : 'bg-amber-50/60 border-amber-300'
+                  : entry.isSubmitted
+                  ? isDark
+                    ? 'bg-emerald-950/20 border-emerald-500/50 shadow-emerald-900/10'
+                    : 'bg-emerald-50/80 border-emerald-300 shadow-sm'
                   : isDark
                   ? 'bg-slate-800/50 border-slate-700/70 hover:border-slate-600'
                   : 'bg-slate-50 border-slate-200 hover:border-slate-300 shadow-sm'
@@ -144,9 +160,16 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
                         .substring(0, 2)}
                     </div>
                     <div>
-                      <h3 className={`font-bold text-sm leading-snug ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                        {entry.qaName}
-                      </h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className={`font-bold text-sm leading-snug ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          {entry.qaName}
+                        </h3>
+                        {entry.isSubmitted && !entry.isOnLeave && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                            <CheckCircle className="w-3 h-3" /> Submitted {entry.submittedAt || ''}
+                          </span>
+                        )}
+                      </div>
                       <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                         {matchedQA?.role || 'Quality Assurance'}
                       </p>
@@ -187,7 +210,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
                       : 'bg-amber-100/80 border-amber-300 text-amber-900'
                   }`}>
                     <UserX className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                    <span>QA is marked ON LEAVE for today. (Reflected automatically in MOM)</span>
+                    <span>QA is marked ON LEAVE for today. (Automatically included as absent in MOM)</span>
                   </div>
                 ) : (
                   <div>
@@ -212,7 +235,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
                     </div>
 
                     {/* Bullet tasks list */}
-                    <div>
+                    <div className="mb-3">
                       <div className="flex items-center justify-between mb-1.5">
                         <label className={`block text-[11px] uppercase tracking-wider font-semibold ${
                           isDark ? 'text-slate-400' : 'text-slate-500'
@@ -294,6 +317,26 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* SUBMIT MY TASK BUTTON BELOW CARD */}
+              {!entry.isOnLeave && (
+                <div className="pt-2 border-t border-slate-700/50 dark:border-slate-800/80 flex items-center justify-between gap-2 mt-2">
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    {entry.isSubmitted ? 'Saved to Live Dashboard' : 'Ready to submit your daily work?'}
+                  </span>
+                  <button
+                    onClick={() => handleSubmit(entry.qaId)}
+                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
+                      entry.isSubmitted
+                        ? 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/40'
+                        : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/25'
+                    }`}
+                  >
+                    {entry.isSubmitted ? <CheckCircle className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+                    <span>{entry.isSubmitted ? 'Update Submission' : 'Submit My Task'}</span>
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}

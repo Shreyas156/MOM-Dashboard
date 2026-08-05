@@ -41,13 +41,13 @@ export const INITIAL_MOM_DATA: DailyMOM = {
   senderName: 'RAKHI DAS',
   senderTitle: 'Executive || Quality Assurance',
   qaTasks: [
-    { qaId: '5', qaName: 'Rakhi Das', isOnLeave: false, status: '', tasks: [] },
-    { qaId: '7', qaName: 'Indranil Suin', isOnLeave: false, status: '', tasks: [] },
-    { qaId: '8', qaName: 'Arka Dastidar', isOnLeave: false, status: '', tasks: [] },
-    { qaId: '3', qaName: 'R Kusuma', isOnLeave: false, status: '', tasks: [] },
-    { qaId: '4', qaName: 'Shreyas Peherkar', isOnLeave: false, status: '', tasks: [] },
-    { qaId: '2', qaName: 'Ajay NR', isOnLeave: false, status: '', tasks: [] },
-    { qaId: '6', qaName: 'Tushar Joshi', isOnLeave: false, status: '', tasks: [] },
+    { qaId: '5', qaName: 'Rakhi Das', isOnLeave: false, isSubmitted: false, status: '', tasks: [] },
+    { qaId: '7', qaName: 'Indranil Suin', isOnLeave: false, isSubmitted: false, status: '', tasks: [] },
+    { qaId: '8', qaName: 'Arka Dastidar', isOnLeave: false, isSubmitted: false, status: '', tasks: [] },
+    { qaId: '3', qaName: 'R Kusuma', isOnLeave: false, isSubmitted: false, status: '', tasks: [] },
+    { qaId: '4', qaName: 'Shreyas Peherkar', isOnLeave: false, isSubmitted: false, status: '', tasks: [] },
+    { qaId: '2', qaName: 'Ajay NR', isOnLeave: false, isSubmitted: false, status: '', tasks: [] },
+    { qaId: '6', qaName: 'Tushar Joshi', isOnLeave: false, isSubmitted: false, status: '', tasks: [] },
   ],
   smokeRows: [
     {

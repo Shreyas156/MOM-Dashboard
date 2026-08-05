@@ -50,6 +50,33 @@ export default function DashboardPage() {
     setMomData(loadedMOM);
   }, [currentDate]);
 
+  // Real-time polling across QAs (fetches shared data every 4s)
+  useEffect(() => {
+    const fetchSharedMOM = async () => {
+      try {
+        const res = await fetch(`/api/mom?date=${currentDate}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            setMomData((prev) => {
+              // Merge cleanly if backend has newer data
+              if (json.data.updatedAt && json.data.updatedAt !== prev.updatedAt) {
+                return json.data;
+              }
+              return prev;
+            });
+          }
+        }
+      } catch (e) {
+        // Fallback active
+      }
+    };
+
+    fetchSharedMOM();
+    const interval = setInterval(fetchSharedMOM, 4000);
+    return () => clearInterval(interval);
+  }, [currentDate]);
+
   useEffect(() => {
     if (theme === 'dark') {
       document.body.className = 'dark-theme';
@@ -77,7 +104,7 @@ export default function DashboardPage() {
     saveStoredMOM(updatedMOM);
     setIsSaved(true);
 
-    // Save to API route asynchronously
+    // Save to API route asynchronously for live team sync
     fetch('/api/mom', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -104,7 +131,6 @@ export default function DashboardPage() {
       return entry;
     });
 
-    // Rebuild present attendees
     const newAttendees = updatedTasks.filter((q) => !q.isOnLeave).map((q) => q.qaName);
 
     const newMOM = {
@@ -113,6 +139,29 @@ export default function DashboardPage() {
       attendees: newAttendees,
     };
     updateMOM(newMOM);
+  };
+
+  // Explicit QA Submit Handler
+  const handleSubmitQATask = (qaId: string) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const updatedTasks = momData.qaTasks.map((entry) => {
+      if (entry.qaId === qaId) {
+        return {
+          ...entry,
+          isSubmitted: true,
+          submittedAt: timeStr,
+        };
+      }
+      return entry;
+    });
+
+    const newAttendees = updatedTasks.filter((q) => !q.isOnLeave).map((q) => q.qaName);
+
+    updateMOM({
+      ...momData,
+      qaTasks: updatedTasks,
+      attendees: newAttendees,
+    });
   };
 
   const handleAddQAToMOM = (qa: QA) => {
@@ -124,6 +173,7 @@ export default function DashboardPage() {
       qaId: qa.id,
       qaName: qa.name,
       isOnLeave: false,
+      isSubmitted: false,
       status: 'Working on Launch.',
       tasks: [],
     };
@@ -223,10 +273,10 @@ export default function DashboardPage() {
             </div>
             <div>
               <h2 className={`font-extrabold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                Daily Standup & Smoke Report Center – {momData.dateFormatted}
+                Dynamic Live QA Standup & Smoke Center – {momData.dateFormatted}
               </h2>
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                Share this live dashboard link with your QA team so each member can fill their daily tasks or toggle leave status.
+                Share this dashboard link with your QA team. Each QA fills their work and clicks <strong>"Submit My Task"</strong> below their card to save live!
               </p>
             </div>
           </div>
@@ -235,11 +285,11 @@ export default function DashboardPage() {
             onClick={() => setIsEmailModalOpen(true)}
             className="flex items-center gap-2 text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-500/20 self-end md:self-auto cursor-pointer"
           >
-            <span>Preview & Compose Email MOM</span>
+            <span>Preview & Send MOM Report</span>
           </button>
         </div>
 
-        {/* Quick Stats Summary */}
+        {/* Quick Stats & Team Submission Tracker */}
         <StatsSummary mom={momData} theme={theme} />
 
         {/* Attendance & Daily Tasks Section */}
@@ -247,6 +297,7 @@ export default function DashboardPage() {
           qaTasks={momData.qaTasks}
           availableQAs={qas}
           onUpdateQATask={handleUpdateQATask}
+          onSubmitQATask={handleSubmitQATask}
           onAddQAToMOM={handleAddQAToMOM}
           theme={theme}
         />

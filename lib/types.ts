@@ -15,6 +15,8 @@ export interface QATaskEntry {
   qaId: string;
   qaName: string;
   isOnLeave: boolean;
+  isSubmitted?: boolean;
+  submittedAt?: string;
   status: string; // e.g. "Working on Launches."
   tasks: string[]; // List of bullet points
 }
