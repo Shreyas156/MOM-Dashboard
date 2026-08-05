@@ -43,6 +43,17 @@ export interface SmokeExecutionRow {
   msiteBugTicketUrl?: string;
 }
 
+export interface EmailSettings {
+  toEmails: string;
+  ccEmails: string;
+  bccEmails: string;
+  fromEmail: string;
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUser?: string;
+  smtpPass?: string;
+}
+
 export interface DailyMOM {
   id: string; // Date string e.g. "2026-08-05"
   dateFormatted: string; // e.g. "05-August-2026"
@@ -51,6 +62,7 @@ export interface DailyMOM {
   smokeRows: SmokeExecutionRow[];
   senderName: string;
   senderTitle: string;
+  emailSettings?: EmailSettings;
   createdAt: string;
   updatedAt: string;
 }

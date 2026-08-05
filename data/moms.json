@@ -3,26 +3,70 @@
     "id": "2026-08-05",
     "dateFormatted": "05-August-2026",
     "createdAt": "2026-08-05T10:00:00.000Z",
-    "updatedAt": "2026-08-05T10:00:00.000Z",
+    "updatedAt": "2026-08-05T10:30:34.874Z",
     "attendees": [
       "Rakhi Das",
       "Indranil Suin",
       "Arka Dastidar",
       "R Kusuma",
-      "Shreyas Peherkar",
-      "Ajay NR",
-      "Tushar Joshi"
+      "Shreyas Peherkar"
     ],
     "senderName": "RAKHI DAS",
     "senderTitle": "Executive || Quality Assurance",
     "qaTasks": [
-      { "qaId": "5", "qaName": "Rakhi Das", "isOnLeave": false, "status": "", "tasks": [] },
-      { "qaId": "7", "qaName": "Indranil Suin", "isOnLeave": false, "status": "", "tasks": [] },
-      { "qaId": "8", "qaName": "Arka Dastidar", "isOnLeave": false, "status": "", "tasks": [] },
-      { "qaId": "3", "qaName": "R Kusuma", "isOnLeave": false, "status": "", "tasks": [] },
-      { "qaId": "4", "qaName": "Shreyas Peherkar", "isOnLeave": false, "status": "", "tasks": [] },
-      { "qaId": "2", "qaName": "Ajay NR", "isOnLeave": false, "status": "", "tasks": [] },
-      { "qaId": "6", "qaName": "Tushar Joshi", "isOnLeave": false, "status": "", "tasks": [] }
+      {
+        "qaId": "5",
+        "qaName": "Rakhi Das",
+        "isOnLeave": false,
+        "status": "Working on Launch ",
+        "tasks": [],
+        "isSubmitted": true,
+        "submittedAt": "15:54"
+      },
+      {
+        "qaId": "7",
+        "qaName": "Indranil Suin",
+        "isOnLeave": false,
+        "status": "",
+        "tasks": []
+      },
+      {
+        "qaId": "8",
+        "qaName": "Arka Dastidar",
+        "isOnLeave": false,
+        "status": "",
+        "tasks": []
+      },
+      {
+        "qaId": "3",
+        "qaName": "R Kusuma",
+        "isOnLeave": false,
+        "status": "",
+        "tasks": []
+      },
+      {
+        "qaId": "4",
+        "qaName": "Shreyas Peherkar",
+        "isOnLeave": false,
+        "status": "Working on Msite company Automation ",
+        "tasks": [],
+        "isSubmitted": true,
+        "submittedAt": "15:54"
+      },
+      {
+        "qaId": "2",
+        "qaName": "Ajay NR",
+        "isOnLeave": true,
+        "status": "",
+        "tasks": []
+      },
+      {
+        "qaId": "6",
+        "qaName": "Tushar Joshi",
+        "isOnLeave": true,
+        "status": "",
+        "tasks": []
+      }
     ],
     "smokeRows": [
       {
