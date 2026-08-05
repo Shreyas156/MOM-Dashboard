@@ -50,16 +50,22 @@ export default function DashboardPage() {
     setMomData(loadedMOM);
   }, [currentDate]);
 
-  // Real-time polling across QAs (fetches shared data every 4s)
+  // Real-time polling across QAs (fetches shared data every 4s, safely skipping if user is typing)
   useEffect(() => {
     const fetchSharedMOM = async () => {
+      // Do not overwrite state if user is actively typing in an input or textarea
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        return;
+      }
+
       try {
         const res = await fetch(`/api/mom?date=${currentDate}`);
         if (res.ok) {
           const json = await res.json();
-          if (json.data) {
+          if (json.data && json.data.updatedAt) {
             setMomData((prev) => {
-              if (json.data.updatedAt && json.data.updatedAt !== prev.updatedAt) {
+              if (json.data.updatedAt !== prev.updatedAt) {
                 return json.data;
               }
               return prev;
@@ -98,6 +104,7 @@ export default function DashboardPage() {
     updatedMOM.attendees = updatedMOM.attendees.filter(
       (name) => name.toLowerCase() !== 'sukanya sharma'
     );
+    updatedMOM.updatedAt = new Date().toISOString();
 
     setMomData(updatedMOM);
     saveStoredMOM(updatedMOM);
