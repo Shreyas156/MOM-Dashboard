@@ -59,7 +59,6 @@ export default function DashboardPage() {
           const json = await res.json();
           if (json.data) {
             setMomData((prev) => {
-              // Merge cleanly if backend has newer data
               if (json.data.updatedAt && json.data.updatedAt !== prev.updatedAt) {
                 return json.data;
               }
@@ -141,15 +140,19 @@ export default function DashboardPage() {
     updateMOM(newMOM);
   };
 
-  // Explicit QA Submit Handler
+  // Explicit QA Submit / Resubmit Handler (Uses 24-hour time format: HH:mm)
   const handleSubmitQATask = (qaId: string) => {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const time24Str = `${hours}:${minutes}`;
+
     const updatedTasks = momData.qaTasks.map((entry) => {
       if (entry.qaId === qaId) {
         return {
           ...entry,
           isSubmitted: true,
-          submittedAt: timeStr,
+          submittedAt: time24Str,
         };
       }
       return entry;

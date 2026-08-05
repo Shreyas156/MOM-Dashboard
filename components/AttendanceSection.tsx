@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { QATaskEntry, QA } from '@/lib/types';
-import { UserX, Plus, Trash2, ListOrdered, ChevronDown, ChevronUp, CheckCircle, Send } from 'lucide-react';
+import { UserX, Plus, Trash2, ListOrdered, ChevronDown, ChevronUp, CheckCircle, Send, RefreshCw } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface AttendanceSectionProps {
@@ -92,7 +92,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
             </h2>
           </div>
           <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Each QA enters their work & smoke test numbers below, then clicks <strong>"Submit My Task"</strong> to confirm!
+            Enter text in Current Work or Tasks field to enable submission. Click <strong>"Submit Again"</strong> to update anytime.
           </p>
         </div>
 
@@ -127,6 +127,11 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
         {qaTasks.map((entry) => {
           const isCollapsed = collapsedCards[entry.qaId];
           const matchedQA = availableQAs.find((q) => q.id === entry.qaId);
+
+          // Validation: Ensure QA has entered text in status OR added task bullets
+          const hasEnteredText =
+            (entry.status && entry.status.trim().length > 0) ||
+            (entry.tasks && entry.tasks.length > 0 && entry.tasks.some((t) => t.trim().length > 0));
 
           return (
             <div
@@ -164,9 +169,11 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
                         <h3 className={`font-bold text-sm leading-snug ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {entry.qaName}
                         </h3>
+
+                        {/* 24-HOUR TIME FORMAT SUBMISSION BADGE BESIDE QA NAME */}
                         {entry.isSubmitted && !entry.isOnLeave && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                            <CheckCircle className="w-3 h-3" /> Submitted {entry.submittedAt || ''}
+                          <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                            <CheckCircle className="w-3 h-3" /> Submitted ({entry.submittedAt || ''})
                           </span>
                         )}
                       </div>
@@ -318,23 +325,52 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
                 )}
               </div>
 
-              {/* SUBMIT MY TASK BUTTON BELOW CARD */}
+              {/* COMPACT & NEAT PASTEL DISABLED BUTTON UI MATCHING USER SCREENSHOT */}
               {!entry.isOnLeave && (
-                <div className="pt-2 border-t border-slate-700/50 dark:border-slate-800/80 flex items-center justify-between gap-2 mt-2">
+                <div className="pt-2.5 border-t border-slate-700/40 dark:border-slate-800/80 flex items-center justify-between gap-2 mt-2">
                   <span className="text-[11px] text-slate-400 font-medium">
-                    {entry.isSubmitted ? 'Saved to Live Dashboard' : 'Ready to submit your daily work?'}
+                    {entry.isSubmitted ? `Submitted at ${entry.submittedAt || ''}` : 'Ready to submit work?'}
                   </span>
-                  <button
-                    onClick={() => handleSubmit(entry.qaId)}
-                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
-                      entry.isSubmitted
-                        ? 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/40'
-                        : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/25'
-                    }`}
-                  >
-                    {entry.isSubmitted ? <CheckCircle className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
-                    <span>{entry.isSubmitted ? 'Update Submission' : 'Submit My Task'}</span>
-                  </button>
+
+                  <div className="flex items-center gap-2">
+                    {entry.isSubmitted ? (
+                      <button
+                        disabled={!hasEnteredText}
+                        onClick={() => handleSubmit(entry.qaId)}
+                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-extrabold transition-all duration-200 ${
+                          hasEnteredText
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md shadow-blue-500/25 hover:scale-[1.02] active:scale-[0.98] cursor-pointer'
+                            : 'bg-[#a5b4fc] text-white font-bold cursor-not-allowed opacity-80 shadow-xs'
+                        }`}
+                        title={
+                          hasEnteredText
+                            ? 'Click to submit updated tasks or metrics'
+                            : 'Enter Current Work or add a Task bullet to enable Submit Again'
+                        }
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 text-white" />
+                        <span>Submit Again</span>
+                      </button>
+                    ) : (
+                      <button
+                        disabled={!hasEnteredText}
+                        onClick={() => handleSubmit(entry.qaId)}
+                        className={`flex items-center gap-1.5 px-5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                          hasEnteredText
+                            ? 'bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 text-slate-950 shadow-lg shadow-emerald-500/25 hover:scale-[1.02] active:scale-[0.98] cursor-pointer'
+                            : 'bg-[#a5b4fc] text-white font-bold cursor-not-allowed opacity-80 shadow-xs'
+                        }`}
+                        title={
+                          hasEnteredText
+                            ? 'Click to submit your daily standup tasks'
+                            : 'Enter Current Work or add a Task bullet to enable Submit'
+                        }
+                      >
+                        {hasEnteredText ? <Send className="w-3.5 h-3.5 fill-slate-950 text-slate-950" /> : null}
+                        <span>Submit</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

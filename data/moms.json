@@ -2,14 +2,16 @@
   "2026-08-05": {
     "id": "2026-08-05",
     "dateFormatted": "05-August-2026",
-    "createdAt": "2026-08-05T10:00:00.000Z",
-    "updatedAt": "2026-08-05T10:30:34.874Z",
+    "createdAt": "2026-08-05T10:56:27.599Z",
+    "updatedAt": "2026-08-05T10:59:40.985Z",
     "attendees": [
       "Rakhi Das",
       "Indranil Suin",
       "Arka Dastidar",
       "R Kusuma",
-      "Shreyas Peherkar"
+      "Shreyas Peherkar",
+      "Ajay NR",
+      "Tushar Joshi"
     ],
     "senderName": "RAKHI DAS",
     "senderTitle": "Executive || Quality Assurance",
@@ -18,15 +20,15 @@
         "qaId": "5",
         "qaName": "Rakhi Das",
         "isOnLeave": false,
-        "status": "Working on Launch ",
-        "tasks": [],
-        "isSubmitted": true,
-        "submittedAt": "15:54"
+        "isSubmitted": false,
+        "status": "",
+        "tasks": []
       },
       {
         "qaId": "7",
         "qaName": "Indranil Suin",
         "isOnLeave": false,
+        "isSubmitted": false,
         "status": "",
         "tasks": []
       },
@@ -34,6 +36,7 @@
         "qaId": "8",
         "qaName": "Arka Dastidar",
         "isOnLeave": false,
+        "isSubmitted": false,
         "status": "",
         "tasks": []
       },
@@ -41,6 +44,7 @@
         "qaId": "3",
         "qaName": "R Kusuma",
         "isOnLeave": false,
+        "isSubmitted": false,
         "status": "",
         "tasks": []
       },
@@ -48,22 +52,23 @@
         "qaId": "4",
         "qaName": "Shreyas Peherkar",
         "isOnLeave": false,
-        "status": "Working on Msite company Automation ",
-        "tasks": [],
-        "isSubmitted": true,
-        "submittedAt": "15:54"
+        "isSubmitted": false,
+        "status": "",
+        "tasks": []
       },
       {
         "qaId": "2",
         "qaName": "Ajay NR",
-        "isOnLeave": true,
+        "isOnLeave": false,
+        "isSubmitted": false,
         "status": "",
         "tasks": []
       },
       {
         "qaId": "6",
         "qaName": "Tushar Joshi",
-        "isOnLeave": true,
+        "isOnLeave": false,
+        "isSubmitted": false,
         "status": "",
         "tasks": []
       }
