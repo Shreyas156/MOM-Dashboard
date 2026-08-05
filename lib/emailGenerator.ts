@@ -6,12 +6,14 @@ export function generateHTMLEmail(mom: DailyMOM): string {
     .map((q) => q.qaName)
     .join(', ');
 
-  const tasksHTML = mom.qaTasks
-    .map((qa) => {
-      if (qa.isOnLeave) {
-        return `<p style="margin: 6px 0 10px 0;"><strong>${escapeHTML(qa.qaName)} :</strong> <span style="color: #dc2626; font-weight: bold;">[ ON LEAVE ]</span></p>`;
-      }
+  const absentAttendees = mom.qaTasks
+    .filter((q) => q.isOnLeave)
+    .map((q) => q.qaName)
+    .join(', ');
 
+  const tasksHTML = mom.qaTasks
+    .filter((q) => !q.isOnLeave)
+    .map((qa) => {
       let bulletsHTML = '';
       if (qa.tasks && qa.tasks.length > 0) {
         const bullets = qa.tasks
@@ -95,44 +97,34 @@ export function generateHTMLEmail(mom: DailyMOM): string {
   <p style="margin-bottom: 14px;">Please find below the quick summary for our daily QA stand-up Meet.</p>
 
   <p style="margin-bottom: 4px;"><strong>Attendees :</strong> ${escapeHTML(presentAttendees || mom.attendees.join(', '))}</p>
+  ${absentAttendees ? `<p style="margin-bottom: 4px;"><strong>Absence :</strong> ${escapeHTML(absentAttendees)}</p>` : ''}
   <p style="margin-bottom: 16px;"><strong>Date :</strong> ${escapeHTML(mom.dateFormatted)}</p>
 
   <p style="margin-bottom: 8px;"><strong>Assigned Tasks :</strong></p>
   
-  <div style="margin-bottom: 20px;">
-    ${tasksHTML}
-  </div>
+  ${tasksHTML}
 
-  <p style="margin-bottom: 10px;"><strong>Please find the daily smoke report execution summary below:</strong></p>
+  <p style="margin-top: 16px; margin-bottom: 8px;"><strong>Daily smoke report execution:</strong></p>
 
-  <table style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 11px; margin-bottom: 24px; border: 1px solid #000000;" border="1">
+  <table style="border-collapse: collapse; width: 100%; font-size: 12px; margin-bottom: 24px;">
     <thead>
-      <tr style="background-color: #fff2cc;">
-        <th colspan="12" style="border: 1px solid #000000; padding: 6px; text-align: center; font-size: 12px; font-weight: bold; color: #000000;">
-          Daily smoke report execution
-        </th>
+      <tr style="background-color: #10b981; color: #ffffff;">
+        <th style="border: 1px solid #000000; padding: 6px; text-align: center;" rowspan="2">Module Name</th>
+        <th style="border: 1px solid #000000; padding: 6px; text-align: center;" rowspan="2">QA</th>
+        <th style="border: 1px solid #000000; padding: 6px; text-align: center;" colspan="5">Desktop</th>
+        <th style="border: 1px solid #000000; padding: 6px; text-align: center;" colspan="5">Msite</th>
       </tr>
-      <tr style="background-color: #d9ead3; font-weight: bold; color: #000000;">
-        <th rowspan="2" style="border: 1px solid #000000; padding: 6px; text-align: center; width: 12%;">Module</th>
-        <th rowspan="2" style="border: 1px solid #000000; padding: 6px; text-align: center; width: 8%;">QA</th>
-        <th colspan="3" style="border: 1px solid #000000; padding: 6px; text-align: center;">Count of Desktop Test Cases</th>
-        <th style="border: 1px solid #000000; padding: 6px; text-align: center;">Desktop</th>
-        <th style="border: 1px solid #000000; padding: 6px; text-align: center;">Bug Ticket ID</th>
-        <th colspan="3" style="border: 1px solid #000000; padding: 6px; text-align: center;">Count of Msite Test Cases</th>
-        <th style="border: 1px solid #000000; padding: 6px; text-align: center;">Msite</th>
-        <th style="border: 1px solid #000000; padding: 6px; text-align: center;">Bug Ticket ID</th>
-      </tr>
-      <tr style="background-color: #d9ead3; font-weight: bold; color: #000000;">
-        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Total count</th>
-        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Pass</th>
-        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Fail</th>
+      <tr style="background-color: #10b981; color: #ffffff;">
+        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Total TC</th>
+        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Passed</th>
+        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Failed</th>
         <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Report</th>
-        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">ID</th>
-        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Total count</th>
-        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Pass</th>
-        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Fail</th>
+        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Bug Ticket</th>
+        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Total TC</th>
+        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Passed</th>
+        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Failed</th>
         <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Report</th>
-        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">ID</th>
+        <th style="border: 1px solid #000000; padding: 5px; text-align: center;">Bug Ticket</th>
       </tr>
     </thead>
     <tbody>
@@ -140,14 +132,13 @@ export function generateHTMLEmail(mom: DailyMOM): string {
     </tbody>
   </table>
 
-  <div style="margin-top: 24px; font-weight: bold;">
-    <p style="margin: 0; text-transform: uppercase;">${escapeHTML(mom.senderName || 'RAKHI DAS')}</p>
-    <p style="margin: 2px 0 0 0; color: #4b5563; font-weight: normal;">${escapeHTML(mom.senderTitle || 'Executive || Quality Assurance')}</p>
-  </div>
+  <p style="margin-bottom: 2px;">Thanks & Regards,</p>
+  <p style="margin: 0; font-weight: bold;">${escapeHTML(mom.senderName || 'RAKHI DAS')}</p>
+  <p style="margin: 0; color: #6b7280; font-size: 12px;">${escapeHTML(mom.senderTitle || 'Executive || Quality Assurance')}</p>
 
 </body>
 </html>
-  `.trim();
+  `;
 }
 
 export function generatePlainTextEmail(mom: DailyMOM): string {
@@ -156,73 +147,38 @@ export function generatePlainTextEmail(mom: DailyMOM): string {
     .map((q) => q.qaName)
     .join(', ');
 
-  let tasksText = '';
-  mom.qaTasks.forEach((qa) => {
-    if (qa.isOnLeave) {
-      tasksText += `${qa.qaName} : [ ON LEAVE ]\n\n`;
-    } else {
-      tasksText += `${qa.qaName} : ${qa.status || ''}\n`;
-      if (qa.tasks && qa.tasks.length > 0) {
-        qa.tasks.forEach((t) => {
-          tasksText += `  • ${t}\n`;
-        });
-      }
-      tasksText += '\n';
-    }
-  });
+  const absentAttendees = mom.qaTasks
+    .filter((q) => q.isOnLeave)
+    .map((q) => q.qaName)
+    .join(', ');
 
-  let tableText = `Daily smoke report execution:\n`;
-  tableText += `Module | QA | Desktop (Total/Pass/Fail/Report/Bug) | Msite (Total/Pass/Fail/Report/Bug)\n`;
-  tableText += `--------------------------------------------------------------------------------\n`;
+  const tasksText = mom.qaTasks
+    .filter((q) => !q.isOnLeave)
+    .map((qa) => {
+      const bullets = qa.tasks.map((t) => `  * ${t}`).join('\n');
+      const statusText = qa.status ? ` : ${qa.status}` : '';
+      return `${qa.qaName}${statusText}\n${bullets}`;
+    })
+    .join('\n\n');
 
-  mom.smokeRows.forEach((r) => {
-    const dStr = r.desktopReport === 'NA' ? 'NA' : `${r.desktopTotal || 0}/${r.desktopPass || 0}/${r.desktopFail || 0} (${r.desktopReport}) [Bug: ${r.desktopBugTicketId}]`;
-    const mStr = r.msiteReport === 'NA' ? 'NA' : `${r.msiteTotal || 0}/${r.msitePass || 0}/${r.msiteFail || 0} (${r.msiteReport}) [Bug: ${r.msiteBugTicketId}]`;
-    tableText += `${r.module} | ${r.qa} | ${dStr} | ${mStr}\n`;
-  });
-
-  return `
-MOM of QA Stand up on ${mom.dateFormatted}
-
-Hi Team,
+  return `Hi Team,
 
 Please find below the quick summary for our daily QA stand-up Meet.
 
-Attendees : ${presentAttendees}
-Date : ${mom.dateFormatted}
+Attendees : ${presentAttendees || mom.attendees.join(', ')}
+${absentAttendees ? `Absence : ${absentAttendees}\n` : ''}Date : ${mom.dateFormatted}
 
 Assigned Tasks :
 
 ${tasksText}
-Please find the daily smoke report execution summary below:
 
-${tableText}
+Daily smoke report execution:
+(See attached HTML or table for full matrix)
 
+Thanks & Regards,
 ${mom.senderName || 'RAKHI DAS'}
 ${mom.senderTitle || 'Executive || Quality Assurance'}
-  `.trim();
-}
-
-function formatCellLink(text: string, url?: string): string {
-  if (!text || text === '-') return '-';
-  
-  // Format multiline bug IDs cleanly
-  const lines = text.split('\n');
-  return lines
-    .map((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return '';
-      if (trimmed === 'Link') {
-        const href = url || '#';
-        return `<a href="${href}" style="color: #1155cc; text-decoration: underline;" target="_blank">Link</a>`;
-      }
-      if (url && url !== '#') {
-        return `<a href="${url}" style="color: #1155cc; text-decoration: underline;" target="_blank">${escapeHTML(trimmed)}</a>`;
-      }
-      return escapeHTML(trimmed);
-    })
-    .filter(Boolean)
-    .join('<br/>');
+  `;
 }
 
 function escapeHTML(str: string): string {
@@ -233,4 +189,15 @@ function escapeHTML(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function formatCellLink(text: string, url?: string): string {
+  if (!text) return '';
+  if (url && url.startsWith('http')) {
+    return `<a href="${url}" style="color: #2563eb; text-decoration: underline;" target="_blank">${escapeHTML(text)}</a>`;
+  }
+  if (text.toLowerCase() === 'link') {
+    return `<span style="color: #2563eb; text-decoration: underline;">Link</span>`;
+  }
+  return escapeHTML(text);
 }
