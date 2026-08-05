@@ -22,11 +22,13 @@ export const EmailModal: React.FC<EmailModalProps> = ({
   theme = 'dark',
 }) => {
   const isDark = theme === 'dark';
+
+  // All React Hooks MUST be called unconditionally at top of component
   const [activeTab, setActiveTab] = useState<'visual' | 'code' | 'text'>('visual');
   const [copiedHtml, setCopiedHtml] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
 
-  // Email Configuration state (All start completely blank by default)
+  // Email Configuration state
   const [showConfig, setShowConfig] = useState(true);
   const [toEmails, setToEmails] = useState(mom.emailSettings?.toEmails || '');
   const [ccEmails, setCcEmails] = useState(mom.emailSettings?.ccEmails || '');
@@ -35,6 +37,11 @@ export const EmailModal: React.FC<EmailModalProps> = ({
   const [smtpUser, setSmtpUser] = useState(mom.emailSettings?.smtpUser || '');
   const [smtpPass, setSmtpPass] = useState(mom.emailSettings?.smtpPass || '');
 
+  // Direct sending state
+  const [isSending, setIsSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Early return AFTER all hooks are defined
   if (!isOpen) return null;
 
   const htmlContent = generateHTMLEmail(mom);
@@ -98,10 +105,6 @@ export const EmailModal: React.FC<EmailModalProps> = ({
 
     window.open(gmailUrl, '_blank');
   };
-
-  // Direct Send via server SMTP
-  const [isSending, setIsSending] = useState(false);
-  const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const handleDirectSend = async () => {
     saveSettings();
