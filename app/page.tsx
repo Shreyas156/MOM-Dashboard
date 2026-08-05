@@ -330,6 +330,7 @@ export default function DashboardPage() {
         isOpen={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
         onUpdateMOM={(updated) => updateMOM({ ...momData, ...updated })}
+        theme={theme}
       />
 
       <RosterModal
