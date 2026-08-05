@@ -1,26 +1,64 @@
-import { DailyMOM, QA, ModuleItem } from './types';
+import { DailyMOM, QA, ModuleItem, SmokeExecutionRow } from './types';
 import { INITIAL_MOM_DATA, DEFAULT_QAS, DEFAULT_MODULES } from './defaultData';
 
 const MOM_STORAGE_KEY_PREFIX = 'mom_dashboard_data_';
 const QAS_STORAGE_KEY = 'mom_dashboard_qas';
 const MODULES_STORAGE_KEY = 'mom_dashboard_modules';
+const SMOKE_ROWS_STORAGE_KEY = 'mom_dashboard_smoke_rows';
+
+export function getStoredSmokeRows(): SmokeExecutionRow[] {
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(SMOKE_ROWS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Error reading smoke rows from localStorage:', e);
+    }
+  }
+  return INITIAL_MOM_DATA.smokeRows;
+}
+
+export function saveStoredSmokeRows(rows: SmokeExecutionRow[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SMOKE_ROWS_STORAGE_KEY, JSON.stringify(rows));
+  } catch (e) {
+    console.error('Error saving smoke rows to localStorage:', e);
+  }
+}
 
 export function getStoredMOM(dateStr: string): DailyMOM {
   let mom: DailyMOM = {
     ...INITIAL_MOM_DATA,
     id: dateStr,
     dateFormatted: formatDateString(dateStr),
+    smokeRows: getStoredSmokeRows(),
   };
 
   if (typeof window !== 'undefined') {
     try {
       const raw = localStorage.getItem(`${MOM_STORAGE_KEY_PREFIX}${dateStr}`);
       if (raw) {
-        mom = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        mom = {
+          ...parsed,
+          smokeRows: parsed.smokeRows && parsed.smokeRows.length > 0 ? parsed.smokeRows : getStoredSmokeRows(),
+        };
       }
     } catch (e) {
       console.error('Error reading MOM from localStorage:', e);
     }
+  }
+
+  // Ensure persistent smokeRows master copy is always attached if local has more filled data
+  const masterSmoke = getStoredSmokeRows();
+  if (masterSmoke && masterSmoke.length > 0) {
+    mom.smokeRows = masterSmoke;
   }
 
   // Filter out Sukanya Sharma if present in old stored data
@@ -50,6 +88,9 @@ export function saveStoredMOM(mom: DailyMOM): void {
       (name) => name.toLowerCase() !== 'sukanya sharma'
     );
     localStorage.setItem(`${MOM_STORAGE_KEY_PREFIX}${mom.id}`, JSON.stringify(mom));
+    if (mom.smokeRows && mom.smokeRows.length > 0) {
+      saveStoredSmokeRows(mom.smokeRows);
+    }
   } catch (e) {
     console.error('Error saving MOM to localStorage:', e);
   }

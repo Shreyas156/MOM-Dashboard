@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DailyMOM, QATaskEntry, SmokeExecutionRow, QA, ModuleItem } from '@/lib/types';
 import {
   getStoredMOM,
@@ -9,6 +9,8 @@ import {
   saveStoredQAs,
   getStoredModules,
   saveStoredModules,
+  getStoredSmokeRows,
+  saveStoredSmokeRows,
   formatDateString,
 } from '@/lib/storage';
 import { INITIAL_MOM_DATA } from '@/lib/defaultData';
@@ -34,6 +36,9 @@ export default function DashboardPage() {
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(true);
 
+  // Track timestamp of recent user manual edit to prevent polling overwrites
+  const lastLocalEditTime = useRef<number>(0);
+
   // Initialize storage & theme
   useEffect(() => {
     const savedTheme = localStorage.getItem('mom_dashboard_theme') as 'dark' | 'light';
@@ -50,12 +55,15 @@ export default function DashboardPage() {
     setMomData(loadedMOM);
   }, [currentDate]);
 
-  // Real-time polling across QAs (fetches shared data every 3s, safely skipping if user is typing)
+  // Real-time polling across QAs (fetches shared data every 3s, safely skipping if user is typing or recently edited)
   useEffect(() => {
     const fetchSharedMOM = async () => {
-      // Do not overwrite state if user is actively typing in an input or textarea
+      // Do not overwrite state if user is actively typing in an input or textarea, or recently edited locally
       const activeEl = document.activeElement;
-      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+      const isUserTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+      const isRecentLocalEdit = Date.now() - lastLocalEditTime.current < 5000;
+
+      if (isUserTyping || isRecentLocalEdit) {
         return;
       }
 
@@ -65,13 +73,40 @@ export default function DashboardPage() {
           const json = await res.json();
           if (json.data && json.data.qaTasks) {
             setMomData((prev) => {
+              // Intelligently merge server smokeRows so filled local cells are never overwritten by nulls
+              let mergedSmokeRows = prev.smokeRows;
+              if (Array.isArray(json.data.smokeRows) && json.data.smokeRows.length > 0) {
+                mergedSmokeRows = json.data.smokeRows.map((serverRow: SmokeExecutionRow) => {
+                  const localRow = prev.smokeRows.find((r) => r.id === serverRow.id);
+                  if (!localRow) return serverRow;
+                  return {
+                    ...serverRow,
+                    desktopTotal: serverRow.desktopTotal ?? localRow.desktopTotal,
+                    desktopPass: serverRow.desktopPass ?? localRow.desktopPass,
+                    desktopFail: serverRow.desktopFail ?? localRow.desktopFail,
+                    desktopReportUrl: serverRow.desktopReportUrl || localRow.desktopReportUrl,
+                    desktopBugTicketId: (serverRow.desktopBugTicketId && serverRow.desktopBugTicketId !== '-') ? serverRow.desktopBugTicketId : localRow.desktopBugTicketId,
+                    desktopBugTicketUrl: serverRow.desktopBugTicketUrl || localRow.desktopBugTicketUrl,
+                    msiteTotal: serverRow.msiteTotal ?? localRow.msiteTotal,
+                    msitePass: serverRow.msitePass ?? localRow.msitePass,
+                    msiteFail: serverRow.msiteFail ?? localRow.msiteFail,
+                    msiteReportUrl: serverRow.msiteReportUrl || localRow.msiteReportUrl,
+                    msiteBugTicketId: (serverRow.msiteBugTicketId && serverRow.msiteBugTicketId !== '-') ? serverRow.msiteBugTicketId : localRow.msiteBugTicketId,
+                    msiteBugTicketUrl: serverRow.msiteBugTicketUrl || localRow.msiteBugTicketUrl,
+                  };
+                });
+              }
+
               const isDifferent =
                 json.data.updatedAt !== prev.updatedAt ||
                 JSON.stringify(json.data.qaTasks) !== JSON.stringify(prev.qaTasks) ||
-                JSON.stringify(json.data.smokeRows) !== JSON.stringify(prev.smokeRows);
+                JSON.stringify(mergedSmokeRows) !== JSON.stringify(prev.smokeRows);
 
               if (isDifferent) {
-                return json.data;
+                return {
+                  ...json.data,
+                  smokeRows: mergedSmokeRows,
+                };
               }
               return prev;
             });
@@ -113,6 +148,9 @@ export default function DashboardPage() {
 
     setMomData(updatedMOM);
     saveStoredMOM(updatedMOM);
+    if (updatedMOM.smokeRows) {
+      saveStoredSmokeRows(updatedMOM.smokeRows);
+    }
     setIsSaved(true);
 
     // Save to API route asynchronously for live team sync
@@ -130,6 +168,11 @@ export default function DashboardPage() {
     const loaded = getStoredMOM(newDate);
     loaded.id = newDate;
     loaded.dateFormatted = formatDateString(newDate);
+    // Ensure persistent master smokeRows are always used across dates
+    const masterRows = getStoredSmokeRows();
+    if (masterRows && masterRows.length > 0) {
+      loaded.smokeRows = masterRows;
+    }
     setMomData(loaded);
   };
 
@@ -209,16 +252,25 @@ export default function DashboardPage() {
 
   // Smoke Execution Table handlers
   const handleUpdateSmokeRow = (rowId: string, updated: Partial<SmokeExecutionRow>) => {
+    lastLocalEditTime.current = Date.now();
     const updatedRows = momData.smokeRows.map((row) => {
       if (row.id === rowId) {
         return { ...row, ...updated };
       }
       return row;
     });
+    saveStoredSmokeRows(updatedRows);
     updateMOM({ ...momData, smokeRows: updatedRows });
+
+    fetch('/api/smoke-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ smokeRows: updatedRows }),
+    }).catch(() => {});
   };
 
   const handleAddSmokeRow = () => {
+    lastLocalEditTime.current = Date.now();
     const newRow: SmokeExecutionRow = {
       id: 'sr_' + Date.now(),
       module: 'New Module',
@@ -234,12 +286,28 @@ export default function DashboardPage() {
       msiteReport: 'Link',
       msiteBugTicketId: '-',
     };
-    updateMOM({ ...momData, smokeRows: [...momData.smokeRows, newRow] });
+    const updatedRows = [...momData.smokeRows, newRow];
+    saveStoredSmokeRows(updatedRows);
+    updateMOM({ ...momData, smokeRows: updatedRows });
+
+    fetch('/api/smoke-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ smokeRows: updatedRows }),
+    }).catch(() => {});
   };
 
   const handleDeleteSmokeRow = (rowId: string) => {
+    lastLocalEditTime.current = Date.now();
     const updatedRows = momData.smokeRows.filter((r) => r.id !== rowId);
+    saveStoredSmokeRows(updatedRows);
     updateMOM({ ...momData, smokeRows: updatedRows });
+
+    fetch('/api/smoke-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ smokeRows: updatedRows }),
+    }).catch(() => {});
   };
 
   // CLEAR FORM ONLY CLEARS QA TASKS, PRESERVING THE SMOKE EXECUTION TABLE DATA!
@@ -253,10 +321,13 @@ export default function DashboardPage() {
         submittedAt: undefined,
       }));
 
+      const currentSmokeRows = momData.smokeRows.length > 0 ? momData.smokeRows : getStoredSmokeRows();
+      saveStoredSmokeRows(currentSmokeRows);
+
       updateMOM({
         ...momData,
         qaTasks: clearedTasks,
-        // smokeRows remain untouched and preserved!
+        smokeRows: currentSmokeRows,
       });
     }
   };

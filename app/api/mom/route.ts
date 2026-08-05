@@ -13,6 +13,7 @@ if (!globalThis.momGlobalStore) {
 }
 
 const DATA_FILE = path.join(process.cwd(), 'data', 'moms.json');
+const SMOKE_DATA_FILE = path.join(process.cwd(), 'data', 'smoke_reports.json');
 
 function ensureDataFile() {
   try {
@@ -28,9 +29,27 @@ function ensureDataFile() {
   }
 }
 
+function getMasterSmokeRowsServer(): any[] | null {
+  if (globalThis.masterSmokeRowsCache && globalThis.masterSmokeRowsCache.length > 0) {
+    return globalThis.masterSmokeRowsCache;
+  }
+  try {
+    if (fs.existsSync(SMOKE_DATA_FILE)) {
+      const content = fs.readFileSync(SMOKE_DATA_FILE, 'utf-8');
+      const parsed = JSON.parse(content || '{}');
+      if (parsed.smokeRows && Array.isArray(parsed.smokeRows) && parsed.smokeRows.length > 0) {
+        globalThis.masterSmokeRowsCache = parsed.smokeRows;
+        return parsed.smokeRows;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date') || '2026-08-05';
+  const masterSmoke = getMasterSmokeRowsServer();
 
   // 1. Try Supabase Cloud DB (Best for multi-device sync)
   if (supabase) {
@@ -42,9 +61,13 @@ export async function GET(req: NextRequest) {
         .single();
 
       if (!error && data && data.data) {
+        const responseData = { ...data.data };
+        if (masterSmoke && masterSmoke.length > 0) {
+          responseData.smokeRows = masterSmoke;
+        }
         // Also update memory cache
-        globalThis.momGlobalStore![date] = data.data;
-        return NextResponse.json({ success: true, data: data.data, source: 'supabase' });
+        globalThis.momGlobalStore![date] = responseData;
+        return NextResponse.json({ success: true, data: responseData, source: 'supabase' });
       }
     } catch (e) {
       // Fall through to memory / file cache
@@ -53,9 +76,13 @@ export async function GET(req: NextRequest) {
 
   // 2. Try Shared In-Memory Store
   if (globalThis.momGlobalStore && globalThis.momGlobalStore[date]) {
+    const responseData = { ...globalThis.momGlobalStore[date] };
+    if (masterSmoke && masterSmoke.length > 0) {
+      responseData.smokeRows = masterSmoke;
+    }
     return NextResponse.json({
       success: true,
-      data: globalThis.momGlobalStore[date],
+      data: responseData,
       source: 'memory',
     });
   }
@@ -68,6 +95,9 @@ export async function GET(req: NextRequest) {
       const store = JSON.parse(fileContent || '{}');
       const dateData = store[date] || null;
       if (dateData) {
+        if (masterSmoke && masterSmoke.length > 0) {
+          dateData.smokeRows = masterSmoke;
+        }
         globalThis.momGlobalStore![date] = dateData;
       }
       return NextResponse.json({ success: true, data: dateData, source: 'file' });
@@ -95,6 +125,20 @@ export async function POST(req: NextRequest) {
     }
     globalThis.momGlobalStore[date] = momData;
 
+    // Update master smoke rows if provided
+    if (Array.isArray(momData.smokeRows) && momData.smokeRows.length > 0) {
+      globalThis.masterSmokeRowsCache = momData.smokeRows;
+      globalThis.masterSmokeRowsUpdatedAt = momData.updatedAt;
+      try {
+        ensureDataFile();
+        fs.writeFileSync(
+          SMOKE_DATA_FILE,
+          JSON.stringify({ updatedAt: momData.updatedAt, smokeRows: momData.smokeRows }, null, 2),
+          'utf-8'
+        );
+      } catch (e) {}
+    }
+
     // 1. Save to Supabase Cloud DB if keys are present
     if (supabase) {
       try {
@@ -104,6 +148,14 @@ export async function POST(req: NextRequest) {
           data: momData,
           updated_at: momData.updatedAt,
         });
+
+        if (Array.isArray(momData.smokeRows) && momData.smokeRows.length > 0) {
+          await supabase.from('smoke_reports').upsert({
+            id: 'master',
+            rows: momData.smokeRows,
+            updated_at: momData.updatedAt,
+          });
+        }
       } catch (e) {
         // Fall through
       }
