@@ -50,7 +50,7 @@ export default function DashboardPage() {
     setMomData(loadedMOM);
   }, [currentDate]);
 
-  // Real-time polling across QAs (fetches shared data every 4s, safely skipping if user is typing)
+  // Real-time polling across QAs (fetches shared data every 3s, safely skipping if user is typing)
   useEffect(() => {
     const fetchSharedMOM = async () => {
       // Do not overwrite state if user is actively typing in an input or textarea
@@ -63,9 +63,14 @@ export default function DashboardPage() {
         const res = await fetch(`/api/mom?date=${currentDate}`);
         if (res.ok) {
           const json = await res.json();
-          if (json.data && json.data.updatedAt) {
+          if (json.data && json.data.qaTasks) {
             setMomData((prev) => {
-              if (json.data.updatedAt !== prev.updatedAt) {
+              const isDifferent =
+                json.data.updatedAt !== prev.updatedAt ||
+                JSON.stringify(json.data.qaTasks) !== JSON.stringify(prev.qaTasks) ||
+                JSON.stringify(json.data.smokeRows) !== JSON.stringify(prev.smokeRows);
+
+              if (isDifferent) {
                 return json.data;
               }
               return prev;
@@ -78,7 +83,7 @@ export default function DashboardPage() {
     };
 
     fetchSharedMOM();
-    const interval = setInterval(fetchSharedMOM, 4000);
+    const interval = setInterval(fetchSharedMOM, 3000);
     return () => clearInterval(interval);
   }, [currentDate]);
 
