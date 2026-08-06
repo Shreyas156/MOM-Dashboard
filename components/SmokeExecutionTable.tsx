@@ -40,10 +40,11 @@ export const SmokeExecutionTable: React.FC<SmokeExecutionTableProps> = ({
     rowId: string;
     field: 'desktopReportUrl' | 'desktopBugTicketUrl' | 'msiteReportUrl' | 'msiteBugTicketUrl';
     title: string;
+    ticketIds: string[];
     currentUrl: string;
   } | null>(null);
 
-  const [urlInputValue, setUrlInputValue] = useState('');
+  const [multiUrlInputs, setMultiUrlInputs] = useState<string[]>(['https://']);
 
   const openUrlModal = (
     rowId: string,
@@ -51,13 +52,52 @@ export const SmokeExecutionTable: React.FC<SmokeExecutionTableProps> = ({
     title: string,
     currentUrl?: string
   ) => {
-    setEditingUrlRow({ rowId, field, title, currentUrl: currentUrl || '' });
-    setUrlInputValue(currentUrl || 'https://');
+    const row = rows.find((r) => r.id === rowId);
+    let ticketIds: string[] = [];
+
+    if (field === 'desktopBugTicketUrl' && row?.desktopBugTicketId) {
+      ticketIds = row.desktopBugTicketId
+        .split(/[\s,;&\/]+/)
+        .map((t) => t.trim())
+        .filter((t) => t && t !== '-');
+    } else if (field === 'msiteBugTicketUrl' && row?.msiteBugTicketId) {
+      ticketIds = row.msiteBugTicketId
+        .split(/[\s,;&\/]+/)
+        .map((t) => t.trim())
+        .filter((t) => t && t !== '-');
+    }
+
+    const existingUrls = currentUrl
+      ? currentUrl.split(/[\s,]+/).map((u) => u.trim()).filter((u) => u.length > 0)
+      : [];
+
+    let initialInputs: string[] = [];
+    if (ticketIds.length > 0) {
+      initialInputs = ticketIds.map((_, idx) => existingUrls[idx] || (existingUrls[0] || 'https://'));
+    } else if (existingUrls.length > 0) {
+      initialInputs = existingUrls;
+    } else {
+      initialInputs = ['https://'];
+    }
+
+    setMultiUrlInputs(initialInputs);
+    setEditingUrlRow({
+      rowId,
+      field,
+      title,
+      ticketIds,
+      currentUrl: currentUrl || '',
+    });
   };
 
   const saveUrlModal = () => {
     if (!editingUrlRow) return;
-    onUpdateRow(editingUrlRow.rowId, { [editingUrlRow.field]: urlInputValue });
+    const validUrls = multiUrlInputs
+      .map((u) => u.trim())
+      .filter((u) => u.length > 0 && u !== 'https://');
+    
+    const finalUrlStr = validUrls.join(', ');
+    onUpdateRow(editingUrlRow.rowId, { [editingUrlRow.field]: finalUrlStr });
     setEditingUrlRow(null);
   };
 
@@ -303,8 +343,12 @@ export const SmokeExecutionTable: React.FC<SmokeExecutionTableProps> = ({
                             row.desktopBugTicketUrl
                           )
                         }
-                        className="text-slate-400 hover:text-blue-500 p-0.5"
-                        title="Edit Bug Ticket URL"
+                        className={`p-0.5 rounded transition-colors ${
+                          row.desktopBugTicketUrl && row.desktopBugTicketUrl.length > 5
+                            ? 'text-blue-400 hover:text-blue-300 bg-blue-500/20'
+                            : 'text-slate-400 hover:text-blue-500'
+                        }`}
+                        title={row.desktopBugTicketUrl ? `Attached URLs: ${row.desktopBugTicketUrl}` : 'Edit Bug Ticket URLs'}
                       >
                         <LinkIcon className="w-3.5 h-3.5" />
                       </button>
@@ -429,8 +473,12 @@ export const SmokeExecutionTable: React.FC<SmokeExecutionTableProps> = ({
                             row.msiteBugTicketUrl
                           )
                         }
-                        className="text-slate-400 hover:text-blue-500 p-0.5"
-                        title="Edit Bug Ticket URL"
+                        className={`p-0.5 rounded transition-colors ${
+                          row.msiteBugTicketUrl && row.msiteBugTicketUrl.length > 5
+                            ? 'text-blue-400 hover:text-blue-300 bg-blue-500/20'
+                            : 'text-slate-400 hover:text-blue-500'
+                        }`}
+                        title={row.msiteBugTicketUrl ? `Attached URLs: ${row.msiteBugTicketUrl}` : 'Edit Bug Ticket URLs'}
                       >
                         <LinkIcon className="w-3.5 h-3.5" />
                       </button>
@@ -531,22 +579,81 @@ export const SmokeExecutionTable: React.FC<SmokeExecutionTableProps> = ({
             </div>
 
             <div className="space-y-4">
-              <div>
-                <label className={`block text-xs mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Target URL (e.g. Jira ticket / Report URL):
-                </label>
-                <input
-                  type="url"
-                  value={urlInputValue}
-                  onChange={(e) => setUrlInputValue(e.target.value)}
-                  placeholder="https://jira.company.com/browse/TICKET-123"
-                  className={`w-full text-sm border rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500 ${
-                    isDark ? 'bg-slate-950 text-slate-200 border-slate-700' : 'bg-slate-50 text-slate-900 border-slate-300'
-                  }`}
-                />
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                {editingUrlRow.ticketIds.length > 0 ? (
+                  editingUrlRow.ticketIds.map((ticketId, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className={`block text-xs font-extrabold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                          Ticket <span className="underline">#{ticketId}</span> Link:
+                        </label>
+                        <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                          Ticket {idx + 1} of {editingUrlRow.ticketIds.length}
+                        </span>
+                      </div>
+                      <input
+                        type="url"
+                        value={multiUrlInputs[idx] || ''}
+                        onChange={(e) => {
+                          const updated = [...multiUrlInputs];
+                          updated[idx] = e.target.value;
+                          setMultiUrlInputs(updated);
+                        }}
+                        placeholder={`https://jira.company.com/browse/${ticketId}`}
+                        className={`w-full text-sm border rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500 ${
+                          isDark ? 'bg-slate-950 text-slate-200 border-slate-700' : 'bg-slate-50 text-slate-900 border-slate-300'
+                        }`}
+                      />
+                    </div>
+                  ))
+                ) : (
+                  multiUrlInputs.map((urlVal, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <label className={`block text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Target URL {multiUrlInputs.length > 1 ? `#${idx + 1}` : ''}:
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={urlVal}
+                          onChange={(e) => {
+                            const updated = [...multiUrlInputs];
+                            updated[idx] = e.target.value;
+                            setMultiUrlInputs(updated);
+                          }}
+                          placeholder="https://jira.company.com/browse/TICKET-123"
+                          className={`w-full text-sm border rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500 ${
+                            isDark ? 'bg-slate-950 text-slate-200 border-slate-700' : 'bg-slate-50 text-slate-900 border-slate-300'
+                          }`}
+                        />
+                        {multiUrlInputs.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setMultiUrlInputs(multiUrlInputs.filter((_, i) => i !== idx))}
+                            className="text-rose-400 hover:text-rose-500 p-2"
+                            title="Remove URL"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {editingUrlRow.field.includes('BugTicket') && (
+                  <button
+                    type="button"
+                    onClick={() => setMultiUrlInputs([...multiUrlInputs, 'https://'])}
+                    className="text-xs text-blue-500 hover:text-blue-400 font-bold flex items-center gap-1 pt-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Extra Ticket Link</span>
+                  </button>
+                )}
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
                 <button
                   onClick={() => setEditingUrlRow(null)}
                   className={`px-3.5 py-1.5 text-xs ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
@@ -555,9 +662,9 @@ export const SmokeExecutionTable: React.FC<SmokeExecutionTableProps> = ({
                 </button>
                 <button
                   onClick={saveUrlModal}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-4 py-1.5 rounded-lg flex items-center gap-1"
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-4 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer"
                 >
-                  <Check className="w-3.5 h-3.5" /> Save Link
+                  <Check className="w-3.5 h-3.5" /> Save Links
                 </button>
               </div>
             </div>
