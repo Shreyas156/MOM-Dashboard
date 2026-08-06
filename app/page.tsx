@@ -12,6 +12,7 @@ import {
   getStoredSmokeRows,
   saveStoredSmokeRows,
   formatDateString,
+  getTodayDateString,
 } from '@/lib/storage';
 import { INITIAL_MOM_DATA } from '@/lib/defaultData';
 import { Navbar } from '@/components/Navbar';
@@ -24,7 +25,7 @@ import { DeploymentGuideModal } from '@/components/DeploymentGuideModal';
 import { Sparkles } from 'lucide-react';
 
 export default function DashboardPage() {
-  const [currentDate, setCurrentDate] = useState<string>('2026-08-05');
+  const [currentDate, setCurrentDate] = useState<string>(getTodayDateString());
   const [momData, setMomData] = useState<DailyMOM>(INITIAL_MOM_DATA);
   const [qas, setQas] = useState<QA[]>([]);
   const [modules, setModules] = useState<ModuleItem[]>([]);

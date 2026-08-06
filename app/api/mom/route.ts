@@ -46,9 +46,17 @@ function getMasterSmokeRowsServer(): any[] | null {
   return null;
 }
 
+function getTodayDateStringServer(): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const date = searchParams.get('date') || '2026-08-05';
+  const date = searchParams.get('date') || getTodayDateStringServer();
   const masterSmoke = getMasterSmokeRowsServer();
 
   // 1. Try Supabase Cloud DB (Best for multi-device sync)

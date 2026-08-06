@@ -148,8 +148,16 @@ export function saveStoredModules(modules: ModuleItem[]): void {
   }
 }
 
+export function getTodayDateString(): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function formatDateString(dateStr: string): string {
-  if (!dateStr) return '05-August-2026';
+  if (!dateStr) dateStr = getTodayDateString();
   const parts = dateStr.split('-');
   if (parts.length !== 3) return dateStr;
   
