@@ -74,27 +74,42 @@ export default function DashboardPage() {
           const json = await res.json();
           if (json.data && json.data.qaTasks) {
             setMomData((prev) => {
-              // Intelligently merge server smokeRows so filled local cells are never overwritten by nulls
-              let mergedSmokeRows = prev.smokeRows;
+              // Intelligently merge server smokeRows so filled local cells & new rows are never removed
+              let mergedSmokeRows = [...prev.smokeRows];
               if (Array.isArray(json.data.smokeRows) && json.data.smokeRows.length > 0) {
-                mergedSmokeRows = json.data.smokeRows.map((serverRow: SmokeExecutionRow) => {
-                  const localRow = prev.smokeRows.find((r) => r.id === serverRow.id);
-                  if (!localRow) return serverRow;
+                const serverMap = new Map<string, SmokeExecutionRow>();
+                json.data.smokeRows.forEach((sr: SmokeExecutionRow) => serverMap.set(sr.id, sr));
+
+                // 1. Update local rows with server data without discarding local filled entries
+                mergedSmokeRows = prev.smokeRows.map((localRow) => {
+                  const serverRow = serverMap.get(localRow.id);
+                  if (!serverRow) return localRow; // Retain locally created rows!
                   return {
                     ...serverRow,
-                    desktopTotal: serverRow.desktopTotal ?? localRow.desktopTotal,
-                    desktopPass: serverRow.desktopPass ?? localRow.desktopPass,
-                    desktopFail: serverRow.desktopFail ?? localRow.desktopFail,
-                    desktopReportUrl: serverRow.desktopReportUrl || localRow.desktopReportUrl,
-                    desktopBugTicketId: (serverRow.desktopBugTicketId && serverRow.desktopBugTicketId !== '-') ? serverRow.desktopBugTicketId : localRow.desktopBugTicketId,
-                    desktopBugTicketUrl: serverRow.desktopBugTicketUrl || localRow.desktopBugTicketUrl,
-                    msiteTotal: serverRow.msiteTotal ?? localRow.msiteTotal,
-                    msitePass: serverRow.msitePass ?? localRow.msitePass,
-                    msiteFail: serverRow.msiteFail ?? localRow.msiteFail,
-                    msiteReportUrl: serverRow.msiteReportUrl || localRow.msiteReportUrl,
-                    msiteBugTicketId: (serverRow.msiteBugTicketId && serverRow.msiteBugTicketId !== '-') ? serverRow.msiteBugTicketId : localRow.msiteBugTicketId,
-                    msiteBugTicketUrl: serverRow.msiteBugTicketUrl || localRow.msiteBugTicketUrl,
+                    module: localRow.module || serverRow.module,
+                    qa: localRow.qa || serverRow.qa,
+                    desktopTotal: localRow.desktopTotal ?? serverRow.desktopTotal,
+                    desktopPass: localRow.desktopPass ?? serverRow.desktopPass,
+                    desktopFail: localRow.desktopFail ?? serverRow.desktopFail,
+                    desktopReport: localRow.desktopReport || serverRow.desktopReport,
+                    desktopReportUrl: localRow.desktopReportUrl || serverRow.desktopReportUrl,
+                    desktopBugTicketId: (localRow.desktopBugTicketId && localRow.desktopBugTicketId !== '-') ? localRow.desktopBugTicketId : serverRow.desktopBugTicketId,
+                    desktopBugTicketUrl: localRow.desktopBugTicketUrl || serverRow.desktopBugTicketUrl,
+                    msiteTotal: localRow.msiteTotal ?? serverRow.msiteTotal,
+                    msitePass: localRow.msitePass ?? serverRow.msitePass,
+                    msiteFail: localRow.msiteFail ?? serverRow.msiteFail,
+                    msiteReport: localRow.msiteReport || serverRow.msiteReport,
+                    msiteReportUrl: localRow.msiteReportUrl || serverRow.msiteReportUrl,
+                    msiteBugTicketId: (localRow.msiteBugTicketId && localRow.msiteBugTicketId !== '-') ? localRow.msiteBugTicketId : serverRow.msiteBugTicketId,
+                    msiteBugTicketUrl: localRow.msiteBugTicketUrl || serverRow.msiteBugTicketUrl,
                   };
+                });
+
+                // 2. Append new server rows if any exist
+                json.data.smokeRows.forEach((serverRow: SmokeExecutionRow) => {
+                  if (!prev.smokeRows.some((r) => r.id === serverRow.id)) {
+                    mergedSmokeRows.push(serverRow);
+                  }
                 });
               }
 
@@ -311,6 +326,34 @@ export default function DashboardPage() {
     }).catch(() => {});
   };
 
+  const handleSaveSmokeRows = () => {
+    lastLocalEditTime.current = Date.now();
+    const rowsToSave = momData.smokeRows;
+    saveStoredSmokeRows(rowsToSave);
+
+    const updatedMOM = {
+      ...momData,
+      smokeRows: rowsToSave,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setMomData(updatedMOM);
+    saveStoredMOM(updatedMOM);
+    setIsSaved(true);
+
+    fetch('/api/smoke-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ smokeRows: rowsToSave }),
+    }).catch(() => {});
+
+    fetch('/api/mom', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedMOM),
+    }).catch(() => {});
+  };
+
   // CLEAR FORM ONLY CLEARS QA TASKS, PRESERVING THE SMOKE EXECUTION TABLE DATA!
   const handleResetData = () => {
     if (confirm('Clear daily QA tasks for fresh entry? (Daily Smoke Report Execution Summary table data will be preserved)')) {
@@ -429,6 +472,7 @@ export default function DashboardPage() {
           onUpdateRow={handleUpdateSmokeRow}
           onAddRow={handleAddSmokeRow}
           onDeleteRow={handleDeleteSmokeRow}
+          onSaveTable={handleSaveSmokeRows}
           theme={theme}
         />
       </main>

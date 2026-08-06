@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { SmokeExecutionRow, QA, ModuleItem } from '@/lib/types';
-import { Table, Plus, Trash2, Link as LinkIcon, X, Check } from 'lucide-react';
+import { Table, Plus, Trash2, Link as LinkIcon, X, Check, Save } from 'lucide-react';
 
 interface SmokeExecutionTableProps {
   rows: SmokeExecutionRow[];
@@ -11,6 +11,7 @@ interface SmokeExecutionTableProps {
   onUpdateRow: (rowId: string, updated: Partial<SmokeExecutionRow>) => void;
   onAddRow: () => void;
   onDeleteRow: (rowId: string) => void;
+  onSaveTable?: () => void;
   theme?: 'dark' | 'light';
 }
 
@@ -21,9 +22,20 @@ export const SmokeExecutionTable: React.FC<SmokeExecutionTableProps> = ({
   onUpdateRow,
   onAddRow,
   onDeleteRow,
+  onSaveTable,
   theme = 'dark',
 }) => {
   const isDark = theme === 'dark';
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleSaveClick = () => {
+    if (onSaveTable) {
+      onSaveTable();
+    }
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
   const [editingUrlRow, setEditingUrlRow] = useState<{
     rowId: string;
     field: 'desktopReportUrl' | 'desktopBugTicketUrl' | 'msiteReportUrl' | 'msiteBugTicketUrl';
@@ -130,12 +142,12 @@ export const SmokeExecutionTable: React.FC<SmokeExecutionTableProps> = ({
               <th className="p-2 border-r border-emerald-800 w-16">Pass</th>
               <th className="p-2 border-r border-emerald-800 w-16 text-rose-300">Fail</th>
               <th className="p-2 border-r border-emerald-800 w-32">Report</th>
-              <th className="p-2 border-r border-emerald-800 w-24">Ticket</th>
+              <th className="p-2 border-r border-emerald-800 w-36 min-w-[110px]">Ticket</th>
               <th className="p-2 border-r border-emerald-800 w-16">Total</th>
               <th className="p-2 border-r border-emerald-800 w-16">Pass</th>
               <th className="p-2 border-r border-emerald-800 w-16 text-rose-300">Fail</th>
               <th className="p-2 border-r border-emerald-800 w-32">Report</th>
-              <th className="p-2 border-r border-emerald-800 w-24">Ticket</th>
+              <th className="p-2 border-r border-emerald-800 w-36 min-w-[110px]">Ticket</th>
             </tr>
           </thead>
 
@@ -277,6 +289,7 @@ export const SmokeExecutionTable: React.FC<SmokeExecutionTableProps> = ({
                         type="text"
                         value={row.desktopBugTicketId}
                         onChange={(e) => onUpdateRow(row.id, { desktopBugTicketId: e.target.value })}
+                        placeholder="e.g. 680379, 680380"
                         className={`w-full bg-transparent text-center font-semibold text-xs focus:outline-none rounded ${
                           isDark ? 'text-blue-400 focus:bg-slate-800' : 'text-blue-600 focus:bg-slate-100'
                         }`}
@@ -402,6 +415,7 @@ export const SmokeExecutionTable: React.FC<SmokeExecutionTableProps> = ({
                         type="text"
                         value={row.msiteBugTicketId}
                         onChange={(e) => onUpdateRow(row.id, { msiteBugTicketId: e.target.value })}
+                        placeholder="e.g. 680379, 680380"
                         className={`w-full bg-transparent text-center font-semibold text-xs focus:outline-none rounded ${
                           isDark ? 'text-blue-400 focus:bg-slate-800' : 'text-blue-600 focus:bg-slate-100'
                         }`}
@@ -456,6 +470,43 @@ export const SmokeExecutionTable: React.FC<SmokeExecutionTableProps> = ({
             </tr>
           </tfoot>
         </table>
+      </div>
+
+      {/* Save Button & Persistence Status Bar */}
+      <div className={`mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl border shadow-lg ${
+        isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50 border-slate-200'
+      }`}>
+        <div className="flex items-center gap-2.5 text-xs">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-500"></span>
+          </span>
+          <span className={isDark ? 'text-slate-300 font-medium' : 'text-slate-600 font-medium'}>
+            Enter single or multiple Bug Ticket IDs (e.g. <code className="text-teal-400 font-bold px-1.5 py-0.5 bg-slate-800/80 rounded border border-slate-700">680379, 680380</code>). Click save to persist permanently.
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSaveClick}
+          className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer ${
+            saveSuccess
+              ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20 scale-[1.02]'
+              : 'bg-teal-400 hover:bg-teal-300 text-slate-950 shadow-teal-500/20 active:scale-95'
+          }`}
+        >
+          {saveSuccess ? (
+            <>
+              <Check className="w-4 h-4 text-slate-950 stroke-[3]" />
+              <span>Execution Summary Saved!</span>
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+              <span>Save Execution Summary</span>
+            </>
+          )}
+        </button>
       </div>
 
       {/* URL Link Editor Modal */}

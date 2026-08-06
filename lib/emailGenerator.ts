@@ -193,11 +193,39 @@ function escapeHTML(str: string): string {
 
 function formatCellLink(text: string, url?: string): string {
   if (!text) return '';
-  if (url && url.startsWith('http')) {
-    return `<a href="${url}" style="color: #2563eb; text-decoration: underline;" target="_blank">${escapeHTML(text)}</a>`;
+  if (text.toLowerCase() === 'link' && url && url.startsWith('http')) {
+    return `<a href="${url}" style="color: #2563eb; text-decoration: underline;" target="_blank">Link</a>`;
   }
   if (text.toLowerCase() === 'link') {
     return `<span style="color: #2563eb; text-decoration: underline;">Link</span>`;
   }
-  return escapeHTML(text);
+  if (text.trim() === '-') {
+    return '-';
+  }
+
+  // Parse any URLs provided (can be comma-separated)
+  const urls = url
+    ? url.split(/[\s,]+/).map((u) => u.trim()).filter((u) => u.startsWith('http'))
+    : [];
+
+  // Split ticket IDs while preserving delimiters (comma, slash, space, &)
+  const parts = text.split(/([,\s\/&]+)/);
+  let urlIndex = 0;
+
+  const formattedParts = parts.map((part) => {
+    const trimmed = part.trim();
+    if (trimmed && !/^[,\s\/&]+$/.test(trimmed) && trimmed !== '-') {
+      const ticketUrl = urls[urlIndex] || urls[0] || (url && url.startsWith('http') ? url : null);
+      if (urls.length > 1 && urlIndex < urls.length) {
+        urlIndex++;
+      }
+      if (ticketUrl) {
+        return `<a href="${escapeHTML(ticketUrl)}" style="color: #2563eb; text-decoration: underline; font-weight: bold;" target="_blank">${escapeHTML(trimmed)}</a>`;
+      }
+      return `<span style="color: #2563eb; font-weight: bold;">${escapeHTML(trimmed)}</span>`;
+    }
+    return escapeHTML(part);
+  });
+
+  return formattedParts.join('');
 }
