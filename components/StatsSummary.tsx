@@ -9,7 +9,7 @@ interface StatsSummaryProps {
   theme?: 'dark' | 'light';
 }
 
-export const StatsSummary: React.FC<StatsSummaryProps> = ({ mom, theme = 'dark' }) => {
+export const StatsSummary: React.FC<StatsSummaryProps> = ({ mom, theme = 'light' }) => {
   const isDark = theme === 'dark';
   const totalQAs = mom.qaTasks.length;
   const onLeaveCount = mom.qaTasks.filter((q) => q.isOnLeave).length;

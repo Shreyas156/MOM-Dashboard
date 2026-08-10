@@ -23,7 +23,7 @@ export const SmokeExecutionTable: React.FC<SmokeExecutionTableProps> = ({
   onAddRow,
   onDeleteRow,
   onSaveTable,
-  theme = 'dark',
+  theme = 'light',
 }) => {
   const isDark = theme === 'dark';
   const [saveSuccess, setSaveSuccess] = useState(false);

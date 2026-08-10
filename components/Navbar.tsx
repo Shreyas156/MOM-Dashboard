@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Calendar, Users, Send, Trash2, CheckCircle2, Sun, Moon } from 'lucide-react';
+import { Calendar, Users, Send, Trash2, CheckCircle2 } from 'lucide-react';
 
 interface NavbarProps {
   currentDate: string;
@@ -10,8 +10,7 @@ interface NavbarProps {
   onOpenRosterModal: () => void;
   onResetData: () => void;
   isSaved: boolean;
-  theme: 'dark' | 'light';
-  onSetTheme: (theme: 'dark' | 'light') => void;
+  theme?: 'dark' | 'light';
   allQAsSubmitted?: boolean;
 }
 
@@ -22,8 +21,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenRosterModal,
   onResetData,
   isSaved,
-  theme,
-  onSetTheme,
+  theme = 'light',
   allQAsSubmitted = false,
 }) => {
   const isDark = theme === 'dark';
@@ -80,38 +78,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Actions */}
         <div className="flex items-center flex-wrap gap-2">
-          {/* SEGMENTED DARK / LIGHT THEME SWITCHER */}
-          <div className={`flex items-center p-1 rounded-xl border ${
-            isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-200/80 border-slate-300'
-          }`}>
-            <button
-              type="button"
-              onClick={() => onSetTheme('dark')}
-              className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg transition-all ${
-                isDark
-                  ? 'bg-slate-900 text-emerald-400 shadow-md border border-slate-700'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-              title="Activate Dark Mode"
-            >
-              <Moon className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Dark</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSetTheme('light')}
-              className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg transition-all ${
-                !isDark
-                  ? 'bg-white text-emerald-600 shadow-md border border-slate-200'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="Activate White/Light Mode"
-            >
-              <Sun className="w-3.5 h-3.5 text-amber-500" />
-              <span>Light</span>
-            </button>
-          </div>
 
           <button
             onClick={onOpenRosterModal}

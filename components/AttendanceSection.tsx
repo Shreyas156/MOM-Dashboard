@@ -20,7 +20,7 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
   onUpdateQATask,
   onSubmitQATask,
   onAddQAToMOM,
-  theme = 'dark',
+  theme = 'light',
 }) => {
   const isDark = theme === 'dark';
   const [newTaskTexts, setNewTaskTexts] = useState<Record<string, string>>({});

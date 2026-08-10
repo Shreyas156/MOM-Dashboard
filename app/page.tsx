@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const [momData, setMomData] = useState<DailyMOM>(INITIAL_MOM_DATA);
   const [qas, setQas] = useState<QA[]>([]);
   const [modules, setModules] = useState<ModuleItem[]>([]);
-  const [theme, setTheme] = useState<'dark' | 'light'>('light');
+  const theme: 'dark' | 'light' = 'light';
 
   // Modals state
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -40,12 +40,10 @@ export default function DashboardPage() {
   // Track timestamp of recent user manual edit to prevent polling overwrites
   const lastLocalEditTime = useRef<number>(0);
 
-  // Initialize storage & theme
+  // Initialize storage
   useEffect(() => {
-    const savedTheme = localStorage.getItem('mom_dashboard_theme') as 'dark' | 'light';
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
+    localStorage.removeItem('mom_dashboard_theme');
+    document.body.className = 'light-theme';
 
     const loadedQAs = getStoredQAs();
     const loadedModules = getStoredModules();
@@ -138,18 +136,7 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [currentDate]);
 
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.body.className = 'dark-theme';
-    } else {
-      document.body.className = 'light-theme';
-    }
-  }, [theme]);
 
-  const handleSetTheme = (newTheme: 'dark' | 'light') => {
-    setTheme(newTheme);
-    localStorage.setItem('mom_dashboard_theme', newTheme);
-  };
 
   // Save MOM data whenever changed
   const updateMOM = (updatedMOM: DailyMOM) => {
@@ -392,7 +379,7 @@ export default function DashboardPage() {
   const submittedCount = momData.qaTasks.filter((q) => q.isSubmitted || q.isOnLeave).length;
   const allQAsSubmitted = totalQAs > 0 && submittedCount === totalQAs;
 
-  const isDark = theme === 'dark';
+  const isDark = false;
 
   return (
     <div className={`min-h-screen transition-colors duration-200 ${
@@ -407,7 +394,6 @@ export default function DashboardPage() {
         onResetData={handleResetData}
         isSaved={isSaved}
         theme={theme}
-        onSetTheme={handleSetTheme}
         allQAsSubmitted={allQAsSubmitted}
       />
 

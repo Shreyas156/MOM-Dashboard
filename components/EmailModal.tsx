@@ -19,7 +19,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({
   isOpen,
   onClose,
   onUpdateMOM,
-  theme = 'dark',
+  theme = 'light',
 }) => {
   const isDark = theme === 'dark';
 
