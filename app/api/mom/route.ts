@@ -69,20 +69,9 @@ function mergeServerMOM(existing: any, incoming: any): any {
       const extQA = existingQaMap.get(incQA.qaId);
       if (!extQA) return incQA;
 
-      const isSubmitted = incQA.isSubmitted || extQA.isSubmitted;
-      const submittedAt = incQA.submittedAt || extQA.submittedAt;
-
-      let tasks = incQA.tasks;
-      if (!tasks || tasks.length === 0) {
-        tasks = extQA.tasks || [];
-      }
-
       return {
         ...extQA,
         ...incQA,
-        isSubmitted,
-        submittedAt,
-        tasks,
       };
     });
 

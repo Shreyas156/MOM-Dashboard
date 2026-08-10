@@ -260,7 +260,8 @@ export default function DashboardPage() {
       qaTasks: updatedTasks,
       attendees: newAttendees,
     };
-    updateMOM(newMOM);
+    const isClearing = updated.tasks && updated.tasks.length === 0;
+    updateMOM(newMOM, isClearing);
   };
 
   // Explicit QA Submit / Resubmit Handler (Uses 12-hour AM/PM time format)
