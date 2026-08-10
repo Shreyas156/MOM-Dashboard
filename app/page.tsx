@@ -23,6 +23,7 @@ import { EmailModal } from '@/components/EmailModal';
 import { RosterModal } from '@/components/RosterModal';
 import { DeploymentGuideModal } from '@/components/DeploymentGuideModal';
 import { Sparkles } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = useState<string>(getTodayDateString());
@@ -37,7 +38,7 @@ export default function DashboardPage() {
   const [isDeployModalOpen, setIsDeployModalOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(true);
 
-  // Track timestamp of recent user manual edit to prevent polling overwrites
+  // Track timestamp of recent user manual edit
   const lastLocalEditTime = useRef<number>(0);
 
   // Initialize storage
@@ -54,89 +55,146 @@ export default function DashboardPage() {
     setMomData(loadedMOM);
   }, [currentDate]);
 
-  // Real-time polling across QAs (fetches shared data every 3s, safely skipping if user is typing or recently edited)
-  useEffect(() => {
-    const fetchSharedMOM = async () => {
-      // Do not overwrite state if user is actively typing in an input or textarea, or recently edited locally
-      const activeEl = document.activeElement;
-      const isUserTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
-      const isRecentLocalEdit = Date.now() - lastLocalEditTime.current < 5000;
+  // Helper to merge incoming server data into local React state smoothly without breaking active user typing
+  const applyServerData = (serverMOM: DailyMOM) => {
+    if (!serverMOM || !serverMOM.qaTasks) return;
 
-      if (isUserTyping || isRecentLocalEdit) {
-        return;
+    setMomData((prev) => {
+      const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+      const isUserTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+
+      const serverQaMap = new Map<string, QATaskEntry>();
+      serverMOM.qaTasks.forEach((q) => serverQaMap.set(q.qaId, q));
+
+      const mergedQATasks = prev.qaTasks.map((localQA) => {
+        const serverQA = serverQaMap.get(localQA.qaId);
+        if (!serverQA) return localQA;
+
+        // If user is currently typing in this specific card, preserve local typing text but update status & submitted badge
+        if (isUserTyping) {
+          return {
+            ...serverQA,
+            tasks: (localQA.tasks && localQA.tasks.length > 0) ? localQA.tasks : serverQA.tasks,
+          };
+        }
+
+        return serverQA;
+      });
+
+      serverMOM.qaTasks.forEach((serverQA) => {
+        if (!mergedQATasks.some((q) => q.qaId === serverQA.qaId)) {
+          mergedQATasks.push(serverQA);
+        }
+      });
+
+      let mergedSmokeRows = [...prev.smokeRows];
+      if (Array.isArray(serverMOM.smokeRows) && serverMOM.smokeRows.length > 0) {
+        const serverSmokeMap = new Map<string, SmokeExecutionRow>();
+        serverMOM.smokeRows.forEach((sr) => serverSmokeMap.set(sr.id, sr));
+
+        mergedSmokeRows = prev.smokeRows.map((localRow) => {
+          const serverRow = serverSmokeMap.get(localRow.id);
+          if (!serverRow) return localRow;
+          if (isUserTyping) return localRow;
+
+          return {
+            ...serverRow,
+            module: localRow.module || serverRow.module,
+            qa: localRow.qa || serverRow.qa,
+            desktopTotal: localRow.desktopTotal ?? serverRow.desktopTotal,
+            desktopPass: localRow.desktopPass ?? serverRow.desktopPass,
+            desktopFail: localRow.desktopFail ?? serverRow.desktopFail,
+            desktopReport: localRow.desktopReport || serverRow.desktopReport,
+            desktopReportUrl: localRow.desktopReportUrl || serverRow.desktopReportUrl,
+            desktopBugTicketId: (localRow.desktopBugTicketId && localRow.desktopBugTicketId !== '-') ? localRow.desktopBugTicketId : serverRow.desktopBugTicketId,
+            desktopBugTicketUrl: localRow.desktopBugTicketUrl || serverRow.desktopBugTicketUrl,
+            msiteTotal: localRow.msiteTotal ?? serverRow.msiteTotal,
+            msitePass: localRow.msitePass ?? serverRow.msitePass,
+            msiteFail: localRow.msiteFail ?? serverRow.msiteFail,
+            msiteReport: localRow.msiteReport || serverRow.msiteReport,
+            msiteReportUrl: localRow.msiteReportUrl || serverRow.msiteReportUrl,
+            msiteBugTicketId: (localRow.msiteBugTicketId && localRow.msiteBugTicketId !== '-') ? localRow.msiteBugTicketId : serverRow.msiteBugTicketId,
+            msiteBugTicketUrl: localRow.msiteBugTicketUrl || serverRow.msiteBugTicketUrl,
+          };
+        });
+
+        serverMOM.smokeRows.forEach((serverRow) => {
+          if (!prev.smokeRows.some((r) => r.id === serverRow.id)) {
+            mergedSmokeRows.push(serverRow);
+          }
+        });
       }
 
+      const isDifferent =
+        serverMOM.updatedAt !== prev.updatedAt ||
+        JSON.stringify(mergedQATasks) !== JSON.stringify(prev.qaTasks) ||
+        JSON.stringify(mergedSmokeRows) !== JSON.stringify(prev.smokeRows);
+
+      if (isDifferent) {
+        return {
+          ...serverMOM,
+          qaTasks: mergedQATasks,
+          smokeRows: mergedSmokeRows,
+        };
+      }
+      return prev;
+    });
+  };
+
+  // 1. Cross-tab instant synchronization via BroadcastChannel
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+    const bc = new BroadcastChannel('mom_live_sync');
+    bc.onmessage = (event) => {
+      if (event.data && event.data.type === 'MOM_UPDATED' && event.data.data) {
+        applyServerData(event.data.data);
+      }
+    };
+    return () => {
+      bc.close();
+    };
+  }, [currentDate]);
+
+  // 2. Real-time Supabase Cloud DB listener (Instant push updates across browsers)
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+    const channel = client
+      .channel(`mom-live-${currentDate}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'moms', filter: `id=eq.${currentDate}` },
+        (payload: any) => {
+          if (payload.new && payload.new.data) {
+            applyServerData(payload.new.data);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  }, [currentDate]);
+
+  // 3. Fast 1.5s background polling fallback
+  useEffect(() => {
+    const fetchSharedMOM = async () => {
       try {
         const res = await fetch(`/api/mom?date=${currentDate}`);
         if (res.ok) {
           const json = await res.json();
           if (json.data && json.data.qaTasks) {
-            setMomData((prev) => {
-              // Intelligently merge server smokeRows so filled local cells & new rows are never removed
-              let mergedSmokeRows = [...prev.smokeRows];
-              if (Array.isArray(json.data.smokeRows) && json.data.smokeRows.length > 0) {
-                const serverMap = new Map<string, SmokeExecutionRow>();
-                json.data.smokeRows.forEach((sr: SmokeExecutionRow) => serverMap.set(sr.id, sr));
-
-                // 1. Update local rows with server data without discarding local filled entries
-                mergedSmokeRows = prev.smokeRows.map((localRow) => {
-                  const serverRow = serverMap.get(localRow.id);
-                  if (!serverRow) return localRow; // Retain locally created rows!
-                  return {
-                    ...serverRow,
-                    module: localRow.module || serverRow.module,
-                    qa: localRow.qa || serverRow.qa,
-                    desktopTotal: localRow.desktopTotal ?? serverRow.desktopTotal,
-                    desktopPass: localRow.desktopPass ?? serverRow.desktopPass,
-                    desktopFail: localRow.desktopFail ?? serverRow.desktopFail,
-                    desktopReport: localRow.desktopReport || serverRow.desktopReport,
-                    desktopReportUrl: localRow.desktopReportUrl || serverRow.desktopReportUrl,
-                    desktopBugTicketId: (localRow.desktopBugTicketId && localRow.desktopBugTicketId !== '-') ? localRow.desktopBugTicketId : serverRow.desktopBugTicketId,
-                    desktopBugTicketUrl: localRow.desktopBugTicketUrl || serverRow.desktopBugTicketUrl,
-                    msiteTotal: localRow.msiteTotal ?? serverRow.msiteTotal,
-                    msitePass: localRow.msitePass ?? serverRow.msitePass,
-                    msiteFail: localRow.msiteFail ?? serverRow.msiteFail,
-                    msiteReport: localRow.msiteReport || serverRow.msiteReport,
-                    msiteReportUrl: localRow.msiteReportUrl || serverRow.msiteReportUrl,
-                    msiteBugTicketId: (localRow.msiteBugTicketId && localRow.msiteBugTicketId !== '-') ? localRow.msiteBugTicketId : serverRow.msiteBugTicketId,
-                    msiteBugTicketUrl: localRow.msiteBugTicketUrl || serverRow.msiteBugTicketUrl,
-                  };
-                });
-
-                // 2. Append new server rows if any exist
-                json.data.smokeRows.forEach((serverRow: SmokeExecutionRow) => {
-                  if (!prev.smokeRows.some((r) => r.id === serverRow.id)) {
-                    mergedSmokeRows.push(serverRow);
-                  }
-                });
-              }
-
-              const isDifferent =
-                json.data.updatedAt !== prev.updatedAt ||
-                JSON.stringify(json.data.qaTasks) !== JSON.stringify(prev.qaTasks) ||
-                JSON.stringify(mergedSmokeRows) !== JSON.stringify(prev.smokeRows);
-
-              if (isDifferent) {
-                return {
-                  ...json.data,
-                  smokeRows: mergedSmokeRows,
-                };
-              }
-              return prev;
-            });
+            applyServerData(json.data);
           }
         }
-      } catch (e) {
-        // Fallback active
-      }
+      } catch (e) {}
     };
 
     fetchSharedMOM();
-    const interval = setInterval(fetchSharedMOM, 3000);
+    const interval = setInterval(fetchSharedMOM, 1500);
     return () => clearInterval(interval);
   }, [currentDate]);
-
-
 
   // Save MOM data whenever changed
   const updateMOM = (updatedMOM: DailyMOM) => {
@@ -156,14 +214,28 @@ export default function DashboardPage() {
     }
     setIsSaved(true);
 
+    // Broadcast immediately across local tabs
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        const bc = new BroadcastChannel('mom_live_sync');
+        bc.postMessage({ type: 'MOM_UPDATED', data: updatedMOM });
+        bc.close();
+      } catch (e) {}
+    }
+
     // Save to API route asynchronously for live team sync
     fetch('/api/mom', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedMOM),
-    }).catch(() => {
-      // Local fallback active
-    });
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data) {
+          applyServerData(data.data);
+        }
+      })
+      .catch(() => {});
   };
 
   const handleDateChange = (newDate: string) => {

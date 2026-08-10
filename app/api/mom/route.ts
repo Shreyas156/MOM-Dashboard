@@ -3,9 +3,10 @@ import { supabase } from '@/lib/supabase';
 import fs from 'fs';
 import path from 'path';
 
-// Shared global memory cache across warm serverless lambdas
 declare global {
   var momGlobalStore: Record<string, any> | undefined;
+  var masterSmokeRowsCache: any[] | undefined;
+  var masterSmokeRowsUpdatedAt: string | undefined;
 }
 
 if (!globalThis.momGlobalStore) {
@@ -25,7 +26,7 @@ function ensureDataFile() {
       fs.writeFileSync(DATA_FILE, JSON.stringify({}), 'utf-8');
     }
   } catch (e) {
-    // Vercel serverless read-only filesystem protection
+    // Vercel serverless read-only protection
   }
 }
 
@@ -54,12 +55,89 @@ function getTodayDateStringServer(): string {
   return `${year}-${month}-${day}`;
 }
 
+// Server-side smart merger to prevent concurrent edits from overwriting each other
+function mergeServerMOM(existing: any, incoming: any): any {
+  if (!existing || !existing.qaTasks) return incoming;
+
+  const merged = { ...existing, ...incoming };
+
+  if (Array.isArray(incoming.qaTasks) && Array.isArray(existing.qaTasks)) {
+    const existingQaMap = new Map<string, any>();
+    existing.qaTasks.forEach((q: any) => existingQaMap.set(q.qaId, q));
+
+    merged.qaTasks = incoming.qaTasks.map((incQA: any) => {
+      const extQA = existingQaMap.get(incQA.qaId);
+      if (!extQA) return incQA;
+
+      // Retain submitted state if either has submitted it
+      const isSubmitted = incQA.isSubmitted || extQA.isSubmitted;
+      const submittedAt = incQA.submittedAt || extQA.submittedAt;
+
+      // Prefer non-empty tasks list
+      let tasks = incQA.tasks;
+      if (!tasks || tasks.length === 0) {
+        tasks = extQA.tasks || [];
+      }
+
+      return {
+        ...extQA,
+        ...incQA,
+        isSubmitted,
+        submittedAt,
+        tasks,
+      };
+    });
+
+    // Retain any QAs from existing that weren't in incoming
+    existing.qaTasks.forEach((extQA: any) => {
+      if (!merged.qaTasks.some((q: any) => q.qaId === extQA.qaId)) {
+        merged.qaTasks.push(extQA);
+      }
+    });
+  }
+
+  // Merge smoke rows preserving filled values
+  if (Array.isArray(incoming.smokeRows) && Array.isArray(existing.smokeRows)) {
+    const existingSmokeMap = new Map<string, any>();
+    existing.smokeRows.forEach((r: any) => existingSmokeMap.set(r.id, r));
+
+    merged.smokeRows = incoming.smokeRows.map((incRow: any) => {
+      const extRow = existingSmokeMap.get(incRow.id);
+      if (!extRow) return incRow;
+
+      return {
+        ...extRow,
+        ...incRow,
+        desktopTotal: incRow.desktopTotal ?? extRow.desktopTotal,
+        desktopPass: incRow.desktopPass ?? extRow.desktopPass,
+        desktopFail: incRow.desktopFail ?? extRow.desktopFail,
+        desktopReportUrl: incRow.desktopReportUrl || extRow.desktopReportUrl,
+        desktopBugTicketId: (incRow.desktopBugTicketId && incRow.desktopBugTicketId !== '-') ? incRow.desktopBugTicketId : extRow.desktopBugTicketId,
+        msiteTotal: incRow.msiteTotal ?? extRow.msiteTotal,
+        msitePass: incRow.msitePass ?? extRow.msitePass,
+        msiteFail: incRow.msiteFail ?? extRow.msiteFail,
+        msiteReportUrl: incRow.msiteReportUrl || extRow.msiteReportUrl,
+        msiteBugTicketId: (incRow.msiteBugTicketId && incRow.msiteBugTicketId !== '-') ? incRow.msiteBugTicketId : extRow.msiteBugTicketId,
+      };
+    });
+
+    existing.smokeRows.forEach((extRow: any) => {
+      if (!merged.smokeRows.some((r: any) => r.id === extRow.id)) {
+        merged.smokeRows.push(extRow);
+      }
+    });
+  }
+
+  merged.updatedAt = new Date().toISOString();
+  return merged;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const date = searchParams.get('date') || getTodayDateStringServer();
   const masterSmoke = getMasterSmokeRowsServer();
 
-  // 1. Try Supabase Cloud DB (Best for multi-device sync)
+  // 1. Try Supabase Cloud DB
   if (supabase) {
     try {
       const { data, error } = await supabase
@@ -73,13 +151,10 @@ export async function GET(req: NextRequest) {
         if (masterSmoke && masterSmoke.length > 0) {
           responseData.smokeRows = masterSmoke;
         }
-        // Also update memory cache
         globalThis.momGlobalStore![date] = responseData;
         return NextResponse.json({ success: true, data: responseData, source: 'supabase' });
       }
-    } catch (e) {
-      // Fall through to memory / file cache
-    }
+    } catch (e) {}
   }
 
   // 2. Try Shared In-Memory Store
@@ -110,38 +185,55 @@ export async function GET(req: NextRequest) {
       }
       return NextResponse.json({ success: true, data: dateData, source: 'file' });
     }
-  } catch (err) {
-    // Return empty
-  }
+  } catch (err) {}
 
   return NextResponse.json({ success: true, data: null, source: 'none' });
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const momData = await req.json();
-    if (!momData || !momData.id) {
+    const incomingData = await req.json();
+    if (!incomingData || !incomingData.id) {
       return NextResponse.json({ success: false, error: 'Invalid MOM data' }, { status: 400 });
     }
 
-    const date = momData.id;
-    momData.updatedAt = new Date().toISOString();
+    const date = incomingData.id;
 
-    // Always update global memory cache immediately
     if (!globalThis.momGlobalStore) {
       globalThis.momGlobalStore = {};
     }
-    globalThis.momGlobalStore[date] = momData;
 
-    // Update master smoke rows if provided
-    if (Array.isArray(momData.smokeRows) && momData.smokeRows.length > 0) {
-      globalThis.masterSmokeRowsCache = momData.smokeRows;
-      globalThis.masterSmokeRowsUpdatedAt = momData.updatedAt;
+    let existingData = globalThis.momGlobalStore[date] || null;
+
+    // Try fetching existing data from Supabase for accurate merging
+    if (supabase) {
+      try {
+        const { data: dbData } = await supabase
+          .from('moms')
+          .select('*')
+          .eq('id', date)
+          .single();
+
+        if (dbData && dbData.data) {
+          existingData = dbData.data;
+        }
+      } catch (e) {}
+    }
+
+    const finalMOMData = mergeServerMOM(existingData, incomingData);
+
+    // Update global memory cache immediately
+    globalThis.momGlobalStore[date] = finalMOMData;
+
+    // Update master smoke rows
+    if (Array.isArray(finalMOMData.smokeRows) && finalMOMData.smokeRows.length > 0) {
+      globalThis.masterSmokeRowsCache = finalMOMData.smokeRows;
+      globalThis.masterSmokeRowsUpdatedAt = finalMOMData.updatedAt;
       try {
         ensureDataFile();
         fs.writeFileSync(
           SMOKE_DATA_FILE,
-          JSON.stringify({ updatedAt: momData.updatedAt, smokeRows: momData.smokeRows }, null, 2),
+          JSON.stringify({ updatedAt: finalMOMData.updatedAt, smokeRows: finalMOMData.smokeRows }, null, 2),
           'utf-8'
         );
       } catch (e) {}
@@ -152,37 +244,33 @@ export async function POST(req: NextRequest) {
       try {
         await supabase.from('moms').upsert({
           id: date,
-          date_formatted: momData.dateFormatted,
-          data: momData,
-          updated_at: momData.updatedAt,
+          date_formatted: finalMOMData.dateFormatted,
+          data: finalMOMData,
+          updated_at: finalMOMData.updatedAt,
         });
 
-        if (Array.isArray(momData.smokeRows) && momData.smokeRows.length > 0) {
+        if (Array.isArray(finalMOMData.smokeRows) && finalMOMData.smokeRows.length > 0) {
           await supabase.from('smoke_reports').upsert({
             id: 'master',
-            rows: momData.smokeRows,
-            updated_at: momData.updatedAt,
+            rows: finalMOMData.smokeRows,
+            updated_at: finalMOMData.updatedAt,
           });
         }
-      } catch (e) {
-        // Fall through
-      }
+      } catch (e) {}
     }
 
-    // 2. Save to Local JSON File (if local environment)
+    // 2. Save to Local JSON File
     try {
       ensureDataFile();
       if (fs.existsSync(DATA_FILE)) {
         const fileContent = fs.readFileSync(DATA_FILE, 'utf-8');
         const store = JSON.parse(fileContent || '{}');
-        store[date] = momData;
+        store[date] = finalMOMData;
         fs.writeFileSync(DATA_FILE, JSON.stringify(store, null, 2), 'utf-8');
       }
-    } catch (e) {
-      // Vercel serverless read-only filesystem fallback handled by memory store
-    }
+    } catch (e) {}
 
-    return NextResponse.json({ success: true, message: 'Saved successfully', data: momData });
+    return NextResponse.json({ success: true, message: 'Saved successfully', data: finalMOMData });
   } catch (err) {
     return NextResponse.json({ success: false, error: (err as Error).message }, { status: 500 });
   }
