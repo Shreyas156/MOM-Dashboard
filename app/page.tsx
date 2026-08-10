@@ -40,7 +40,7 @@ export default function DashboardPage() {
   // Track timestamp of recent user manual edit
   const lastLocalEditTime = useRef<number>(0);
 
-  // Initialize storage
+  // Initialize storage & persistent Smoke Execution Table
   useEffect(() => {
     localStorage.removeItem('mom_dashboard_theme');
     document.body.className = 'light-theme';
@@ -52,6 +52,20 @@ export default function DashboardPage() {
 
     const loadedMOM = getStoredMOM(currentDate);
     setMomData(loadedMOM);
+
+    // Fetch persistent Master Smoke Execution Summary Table data
+    fetch('/api/smoke-report')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.smokeRows) && json.smokeRows.length > 0) {
+          saveStoredSmokeRows(json.smokeRows);
+          setMomData((prev) => ({
+            ...prev,
+            smokeRows: json.smokeRows,
+          }));
+        }
+      })
+      .catch(() => {});
   }, [currentDate]);
 
   // Debounced API saver to prevent spamming n8n on every single keystroke
