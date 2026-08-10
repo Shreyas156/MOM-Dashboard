@@ -59,6 +59,16 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
   };
 
   const handleSubmit = (qaId: string) => {
+    // Automatically convert any pending text typed in the input box into a task bullet before submitting!
+    const pendingText = (newTaskTexts[qaId] || '').trim();
+    if (pendingText) {
+      const currentEntry = qaTasks.find((q) => q.qaId === qaId);
+      if (currentEntry) {
+        const updatedTasks = [...currentEntry.tasks, pendingText];
+        onUpdateQATask(qaId, { tasks: updatedTasks });
+        setNewTaskTexts((prev) => ({ ...prev, [qaId]: '' }));
+      }
+    }
     onSubmitQATask(qaId);
   };
 
@@ -133,10 +143,12 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
               const isCollapsed = collapsedCards[entry.qaId];
               const matchedQA = availableQAs.find((q) => q.id === entry.qaId);
 
-              // Validation: Ensure QA has entered text in status OR added task bullets
+              // Validation: Ensure QA has entered text in status, added task bullets, OR typed in input box
+              const pendingTaskText = (newTaskTexts[entry.qaId] || '').trim();
               const hasEnteredText =
                 (entry.status && entry.status.trim().length > 0) ||
-                (entry.tasks && entry.tasks.length > 0 && entry.tasks.some((t) => t.trim().length > 0));
+                (entry.tasks && entry.tasks.length > 0 && entry.tasks.some((t) => t.trim().length > 0)) ||
+                pendingTaskText.length > 0;
 
               return (
                 <div
@@ -279,8 +291,12 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleAddTaskBullet(entry.qaId);
                               }}
-                              placeholder="+ Add new task bullet point..."
-                              className={`flex-1 text-xs border rounded-lg px-3 py-1.5 focus:outline-none focus:border-emerald-500 ${
+                              onBlur={() => {
+                                const text = (newTaskTexts[entry.qaId] || '').trim();
+                                if (text) handleAddTaskBullet(entry.qaId);
+                              }}
+                              placeholder="+ Type task / launch item here..."
+                              className={`flex-1 text-xs border rounded-lg px-3 py-1.5 focus:outline-none focus:border-emerald-500 transition-colors ${
                                 isDark
                                   ? 'bg-slate-900 text-slate-200 border-slate-700/80'
                                   : 'bg-white text-slate-900 border-slate-300 shadow-xs'
@@ -288,13 +304,15 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
                             />
                             <button
                               onClick={() => handleAddTaskBullet(entry.qaId)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
-                                isDark
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                                (newTaskTexts[entry.qaId] || '').trim().length > 0
+                                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer'
+                                  : isDark
                                   ? 'bg-slate-700 hover:bg-slate-600 text-slate-200'
-                                  : 'bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold'
+                                  : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
                               }`}
                             >
-                              <Plus className="w-3.5 h-3.5" /> Add
+                              <Plus className="w-3.5 h-3.5" /> Add Task
                             </button>
                           </div>
                         </div>
