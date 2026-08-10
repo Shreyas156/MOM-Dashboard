@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { redis } from '@/lib/kv';
 import fs from 'fs';
 import path from 'path';
 
@@ -137,7 +138,21 @@ export async function GET(req: NextRequest) {
   const date = searchParams.get('date') || getTodayDateStringServer();
   const masterSmoke = getMasterSmokeRowsServer();
 
-  // 1. Try Supabase Cloud DB
+  // 1. Try Upstash Redis / Vercel KV Cloud Store
+  if (redis) {
+    try {
+      const kvData = await redis.get<any>(`mom:${date}`);
+      if (kvData) {
+        if (masterSmoke && masterSmoke.length > 0) {
+          kvData.smokeRows = masterSmoke;
+        }
+        globalThis.momGlobalStore![date] = kvData;
+        return NextResponse.json({ success: true, data: kvData, source: 'upstash-redis' });
+      }
+    } catch (e) {}
+  }
+
+  // 2. Try Supabase Cloud DB
   if (supabase) {
     try {
       const { data, error } = await supabase
@@ -157,7 +172,7 @@ export async function GET(req: NextRequest) {
     } catch (e) {}
   }
 
-  // 2. Try Shared In-Memory Store
+  // 3. Try Shared In-Memory Store
   if (globalThis.momGlobalStore && globalThis.momGlobalStore[date]) {
     const responseData = { ...globalThis.momGlobalStore[date] };
     if (masterSmoke && masterSmoke.length > 0) {
@@ -170,7 +185,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // 3. Fallback to Local JSON File
+  // 4. Fallback to Local JSON File
   ensureDataFile();
   try {
     if (fs.existsSync(DATA_FILE)) {
@@ -205,8 +220,15 @@ export async function POST(req: NextRequest) {
 
     let existingData = globalThis.momGlobalStore[date] || null;
 
-    // Try fetching existing data from Supabase for accurate merging
-    if (supabase) {
+    // Try fetching existing data from Upstash Redis / Vercel KV first
+    if (redis) {
+      try {
+        const kvData = await redis.get<any>(`mom:${date}`);
+        if (kvData) {
+          existingData = kvData;
+        }
+      } catch (e) {}
+    } else if (supabase) {
       try {
         const { data: dbData } = await supabase
           .from('moms')
@@ -239,7 +261,17 @@ export async function POST(req: NextRequest) {
       } catch (e) {}
     }
 
-    // 1. Save to Supabase Cloud DB if keys are present
+    // 1. Save to Upstash Redis / Vercel KV Cloud Store
+    if (redis) {
+      try {
+        await redis.set(`mom:${date}`, finalMOMData);
+        if (Array.isArray(finalMOMData.smokeRows) && finalMOMData.smokeRows.length > 0) {
+          await redis.set('smoke:master', finalMOMData.smokeRows);
+        }
+      } catch (e) {}
+    }
+
+    // 2. Save to Supabase Cloud DB if keys are present
     if (supabase) {
       try {
         await supabase.from('moms').upsert({
@@ -259,7 +291,7 @@ export async function POST(req: NextRequest) {
       } catch (e) {}
     }
 
-    // 2. Save to Local JSON File
+    // 3. Save to Local JSON File
     try {
       ensureDataFile();
       if (fs.existsSync(DATA_FILE)) {

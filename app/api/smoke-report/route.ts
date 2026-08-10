@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { redis } from '@/lib/kv';
 import fs from 'fs';
 import path from 'path';
 
@@ -22,7 +23,23 @@ function ensureSmokeDataFile() {
 }
 
 export async function GET() {
-  // 1. Try Supabase Cloud DB
+  // 1. Try Upstash Redis / Vercel KV
+  if (redis) {
+    try {
+      const rows = await redis.get<any[]>('smoke:master');
+      if (rows && Array.isArray(rows)) {
+        globalThis.masterSmokeRowsCache = rows;
+        return NextResponse.json({
+          success: true,
+          smokeRows: rows,
+          updatedAt: new Date().toISOString(),
+          source: 'upstash-redis',
+        });
+      }
+    } catch (e) {}
+  }
+
+  // 2. Try Supabase Cloud DB
   if (supabase) {
     try {
       const { data, error } = await supabase
@@ -41,12 +58,10 @@ export async function GET() {
           source: 'supabase',
         });
       }
-    } catch (e) {
-      // Fallback to memory / file
-    }
+    } catch (e) {}
   }
 
-  // 2. Try In-Memory Cache
+  // 3. Try In-Memory Cache
   if (globalThis.masterSmokeRowsCache && globalThis.masterSmokeRowsCache.length > 0) {
     return NextResponse.json({
       success: true,
@@ -56,7 +71,7 @@ export async function GET() {
     });
   }
 
-  // 3. Fallback to Local JSON File
+  // 4. Fallback to Local JSON File
   ensureSmokeDataFile();
   try {
     if (fs.existsSync(SMOKE_DATA_FILE)) {
@@ -73,9 +88,7 @@ export async function GET() {
         });
       }
     }
-  } catch (err) {
-    // Fall through
-  }
+  } catch (err) {}
 
   return NextResponse.json({ success: true, smokeRows: [], source: 'none' });
 }
@@ -93,7 +106,14 @@ export async function POST(req: NextRequest) {
     globalThis.masterSmokeRowsCache = smokeRows;
     globalThis.masterSmokeRowsUpdatedAt = updatedAt;
 
-    // 1. Save to Supabase Cloud DB
+    // 1. Save to Upstash Redis / Vercel KV
+    if (redis) {
+      try {
+        await redis.set('smoke:master', smokeRows);
+      } catch (e) {}
+    }
+
+    // 2. Save to Supabase Cloud DB
     if (supabase) {
       try {
         await supabase.from('smoke_reports').upsert({
@@ -101,9 +121,7 @@ export async function POST(req: NextRequest) {
           rows: smokeRows,
           updated_at: updatedAt,
         });
-      } catch (e) {
-        // Fall through
-      }
+      } catch (e) {}
     }
 
     // 2. Save to Local JSON File
