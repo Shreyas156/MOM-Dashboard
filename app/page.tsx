@@ -54,30 +54,25 @@ export default function DashboardPage() {
     setMomData(loadedMOM);
   }, [currentDate]);
 
+  // Debounced API saver to prevent spamming n8n on every single keystroke
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Helper to merge incoming server data into local React state smoothly without breaking active user typing
   const applyServerData = (serverMOM: DailyMOM) => {
     if (!serverMOM || !serverMOM.qaTasks) return;
 
-    setMomData((prev) => {
-      const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
-      const isUserTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+    // IF USER IS CURRENTLY TYPING IN ANY INPUT OR TEXTAREA, SKIP BACKGROUND RE-RENDERS TO PREVENT FLICKERING
+    const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+    const isUserTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+    if (isUserTyping) return;
 
+    setMomData((prev) => {
       const serverQaMap = new Map<string, QATaskEntry>();
       serverMOM.qaTasks.forEach((q) => serverQaMap.set(q.qaId, q));
 
       const mergedQATasks = prev.qaTasks.map((localQA) => {
         const serverQA = serverQaMap.get(localQA.qaId);
-        if (!serverQA) return localQA;
-
-        // If user is currently typing in this specific card, preserve local typing text but update status & submitted badge
-        if (isUserTyping) {
-          return {
-            ...serverQA,
-            tasks: (localQA.tasks && localQA.tasks.length > 0) ? localQA.tasks : serverQA.tasks,
-          };
-        }
-
-        return serverQA;
+        return serverQA || localQA;
       });
 
       serverMOM.qaTasks.forEach((serverQA) => {
@@ -94,7 +89,6 @@ export default function DashboardPage() {
         mergedSmokeRows = prev.smokeRows.map((localRow) => {
           const serverRow = serverSmokeMap.get(localRow.id);
           if (!serverRow) return localRow;
-          if (isUserTyping) return localRow;
 
           return {
             ...serverRow,
@@ -154,10 +148,14 @@ export default function DashboardPage() {
     };
   }, [currentDate]);
 
-
-  // 3. Fast 1.5s background polling fallback
+  // 2. Background polling fallback (Every 3s)
   useEffect(() => {
     const fetchSharedMOM = async () => {
+      // Skip fetching if user is currently typing to avoid input re-renders
+      const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+      const isUserTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+      if (isUserTyping) return;
+
       try {
         const res = await fetch(`/api/mom?date=${currentDate}`);
         if (res.ok) {
@@ -170,12 +168,12 @@ export default function DashboardPage() {
     };
 
     fetchSharedMOM();
-    const interval = setInterval(fetchSharedMOM, 1500);
+    const interval = setInterval(fetchSharedMOM, 3000);
     return () => clearInterval(interval);
   }, [currentDate]);
 
-  // Save MOM data whenever changed
-  const updateMOM = (updatedMOM: DailyMOM) => {
+  // Save MOM data whenever changed (debounced to avoid network spam on keystrokes)
+  const updateMOM = (updatedMOM: DailyMOM, syncImmediately = false) => {
     // Purge Sukanya from any updates
     updatedMOM.qaTasks = updatedMOM.qaTasks.filter(
       (q) => q.qaId !== '1' && q.qaName.toLowerCase() !== 'sukanya sharma'
@@ -192,28 +190,31 @@ export default function DashboardPage() {
     }
     setIsSaved(true);
 
-    // Broadcast immediately across local tabs
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      try {
-        const bc = new BroadcastChannel('mom_live_sync');
-        bc.postMessage({ type: 'MOM_UPDATED', data: updatedMOM });
-        bc.close();
-      } catch (e) {}
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
 
-    // Save to API route asynchronously for live team sync
-    fetch('/api/mom', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedMOM),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.data) {
-          applyServerData(data.data);
-        }
-      })
-      .catch(() => {});
+    const postToServer = () => {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        try {
+          const bc = new BroadcastChannel('mom_live_sync');
+          bc.postMessage({ type: 'MOM_UPDATED', data: updatedMOM });
+          bc.close();
+        } catch (e) {}
+      }
+
+      fetch('/api/mom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedMOM),
+      }).catch(() => {});
+    };
+
+    if (syncImmediately) {
+      postToServer();
+    } else {
+      saveTimeoutRef.current = setTimeout(postToServer, 1500);
+    }
   };
 
   const handleDateChange = (newDate: string) => {
@@ -272,11 +273,14 @@ export default function DashboardPage() {
 
     const newAttendees = updatedTasks.filter((q) => !q.isOnLeave).map((q) => q.qaName);
 
-    updateMOM({
-      ...momData,
-      qaTasks: updatedTasks,
-      attendees: newAttendees,
-    });
+    updateMOM(
+      {
+        ...momData,
+        qaTasks: updatedTasks,
+        attendees: newAttendees,
+      },
+      true
+    );
   };
 
   const handleAddQAToMOM = (qa: QA) => {
