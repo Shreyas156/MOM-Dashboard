@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/mongodb';
+import { redis } from '@/lib/kv';
 import fs from 'fs';
 import path from 'path';
 
@@ -22,23 +22,21 @@ function ensureSmokeDataFile() {
 }
 
 export async function GET() {
-  // 1. Try MongoDB Atlas
-  try {
-    const db = await getDatabase();
-    if (db) {
-      const doc = await db.collection('smoke_reports').findOne({ id: 'master' });
-      if (doc && doc.rows) {
-        globalThis.masterSmokeRowsCache = doc.rows;
-        globalThis.masterSmokeRowsUpdatedAt = doc.updatedAt;
+  // 1. Try Upstash Redis / Vercel KV
+  if (redis) {
+    try {
+      const rows = await redis.get<any[]>('smoke:master');
+      if (rows && Array.isArray(rows)) {
+        globalThis.masterSmokeRowsCache = rows;
         return NextResponse.json({
           success: true,
-          smokeRows: doc.rows,
-          updatedAt: doc.updatedAt,
-          source: 'mongodb',
+          smokeRows: rows,
+          updatedAt: new Date().toISOString(),
+          source: 'upstash-redis',
         });
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+  }
 
   // 2. Try In-Memory Cache
   if (globalThis.masterSmokeRowsCache && globalThis.masterSmokeRowsCache.length > 0) {
@@ -85,17 +83,12 @@ export async function POST(req: NextRequest) {
     globalThis.masterSmokeRowsCache = smokeRows;
     globalThis.masterSmokeRowsUpdatedAt = updatedAt;
 
-    // 1. Save to MongoDB Atlas
-    try {
-      const db = await getDatabase();
-      if (db) {
-        await db.collection('smoke_reports').updateOne(
-          { id: 'master' },
-          { $set: { id: 'master', rows: smokeRows, updatedAt } },
-          { upsert: true }
-        );
-      }
-    } catch (e) {}
+    // 1. Save to Upstash Redis / Vercel KV
+    if (redis) {
+      try {
+        await redis.set('smoke:master', smokeRows);
+      } catch (e) {}
+    }
 
     // 2. Save to Local JSON File
     try {

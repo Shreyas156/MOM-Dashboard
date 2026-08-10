@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/mongodb';
+import { redis } from '@/lib/kv';
 import fs from 'fs';
 import path from 'path';
 
@@ -133,21 +133,19 @@ export async function GET(req: NextRequest) {
   const date = searchParams.get('date') || getTodayDateStringServer();
   const masterSmoke = getMasterSmokeRowsServer();
 
-  // 1. Try MongoDB Atlas
-  try {
-    const db = await getDatabase();
-    if (db) {
-      const doc = await db.collection('moms').findOne({ id: date });
-      if (doc && doc.data) {
-        const responseData = { ...doc.data };
+  // 1. Try Upstash Redis / Vercel KV Cloud DB (Ultra-Fast <10ms)
+  if (redis) {
+    try {
+      const kvData = await redis.get<any>(`mom:${date}`);
+      if (kvData && kvData.qaTasks) {
         if (masterSmoke && masterSmoke.length > 0) {
-          responseData.smokeRows = masterSmoke;
+          kvData.smokeRows = masterSmoke;
         }
-        globalThis.momGlobalStore![date] = responseData;
-        return NextResponse.json({ success: true, data: responseData, source: 'mongodb' });
+        globalThis.momGlobalStore![date] = kvData;
+        return NextResponse.json({ success: true, data: kvData, source: 'upstash-redis' });
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+  }
 
   // 2. Try Shared In-Memory Store
   if (globalThis.momGlobalStore && globalThis.momGlobalStore[date]) {
@@ -197,13 +195,12 @@ export async function POST(req: NextRequest) {
 
     let existingData = globalThis.momGlobalStore[date] || null;
 
-    // Try fetching existing data from MongoDB Atlas for accurate merging
-    const db = await getDatabase();
-    if (db) {
+    // Try fetching existing data from Upstash Redis for accurate merging
+    if (redis) {
       try {
-        const doc = await db.collection('moms').findOne({ id: date });
-        if (doc && doc.data) {
-          existingData = doc.data;
+        const kvData = await redis.get<any>(`mom:${date}`);
+        if (kvData && kvData.qaTasks) {
+          existingData = kvData;
         }
       } catch (e) {}
     }
@@ -227,29 +224,14 @@ export async function POST(req: NextRequest) {
       } catch (e) {}
     }
 
-    // 1. Save to MongoDB Atlas with auto-expire timestamp
-    if (db) {
+    // 1. Save to Upstash Redis / Vercel KV with 7-day auto-expire (ex: 604800 seconds)
+    if (redis) {
       try {
-        await db.collection('moms').updateOne(
-          { id: date },
-          {
-            $set: {
-              id: date,
-              dateFormatted: finalMOMData.dateFormatted,
-              data: finalMOMData,
-              updatedAt: finalMOMData.updatedAt,
-              createdAt: new Date(), // Auto-deleted after 7 days via TTL index
-            },
-          },
-          { upsert: true }
-        );
+        // Auto-expires log after 7 days so free storage quota is never exceeded!
+        await redis.set(`mom:${date}`, finalMOMData, { ex: 7 * 24 * 60 * 60 });
 
         if (Array.isArray(finalMOMData.smokeRows) && finalMOMData.smokeRows.length > 0) {
-          await db.collection('smoke_reports').updateOne(
-            { id: 'master' },
-            { $set: { id: 'master', rows: finalMOMData.smokeRows, updatedAt: finalMOMData.updatedAt } },
-            { upsert: true }
-          );
+          await redis.set('smoke:master', finalMOMData.smokeRows);
         }
       } catch (e) {}
     }
