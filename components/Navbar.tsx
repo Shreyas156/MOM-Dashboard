@@ -1,14 +1,15 @@
 'use client';
 
 import React from 'react';
-import { Calendar, Users, Send, Trash2, CheckCircle2 } from 'lucide-react';
+import { Calendar, Users, Send, CheckCircle2, Sun, Moon } from 'lucide-react';
 
 interface NavbarProps {
   currentDate: string;
   onDateChange: (date: string) => void;
   onOpenEmailModal: () => void;
   onOpenRosterModal: () => void;
-  onResetData: () => void;
+  onResetData?: () => void;
+  onToggleTheme?: () => void;
   isSaved: boolean;
   theme?: 'dark' | 'light';
   allQAsSubmitted?: boolean;
@@ -19,7 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onDateChange,
   onOpenEmailModal,
   onOpenRosterModal,
-  onResetData,
+  onToggleTheme,
   isSaved,
   theme = 'light',
   allQAsSubmitted = false,
@@ -78,10 +79,34 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Actions */}
         <div className="flex items-center flex-wrap gap-2">
+          {/* SLEEK COOL THEME TOGGLE */}
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border transition-all cursor-pointer ${
+                isDark
+                  ? 'bg-slate-800 hover:bg-slate-750 text-amber-300 border-slate-700/80 shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-indigo-700 border-slate-300 shadow-xs'
+              }`}
+              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {isDark ? (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                  <span>Light Mode</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-indigo-600 fill-indigo-600" />
+                  <span>Dark Mode</span>
+                </>
+              )}
+            </button>
+          )}
 
           <button
             onClick={onOpenRosterModal}
-            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border transition-all ${
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border transition-all ${
               isDark
                 ? 'bg-slate-800/60 hover:bg-slate-800 text-slate-300 border-slate-700/60'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
@@ -91,7 +116,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Users className="w-3.5 h-3.5 text-blue-500" />
             <span>Roster</span>
           </button>
-
 
           {/* SEND REPORT BUTTON - DISABLED UNTIL ALL QAS SUBMIT */}
           <button

@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const [momData, setMomData] = useState<DailyMOM>(INITIAL_MOM_DATA);
   const [qas, setQas] = useState<QA[]>([]);
   const [modules, setModules] = useState<ModuleItem[]>([]);
-  const theme: 'dark' | 'light' = 'light';
+  const [theme, setTheme] = useState<'dark' | 'light'>('light');
 
   // Modals state
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -42,8 +42,9 @@ export default function DashboardPage() {
 
   // Initialize storage & persistent Smoke Execution Table
   useEffect(() => {
-    localStorage.removeItem('mom_dashboard_theme');
-    document.body.className = 'light-theme';
+    const savedTheme = (localStorage.getItem('mom_dashboard_theme') as 'dark' | 'light') || 'light';
+    setTheme(savedTheme);
+    document.body.className = savedTheme === 'dark' ? 'dark-theme' : 'light-theme';
 
     const loadedQAs = getStoredQAs();
     const loadedModules = getStoredModules();
@@ -448,7 +449,14 @@ export default function DashboardPage() {
   const submittedCount = momData.qaTasks.filter((q) => q.isSubmitted || q.isOnLeave).length;
   const allQAsSubmitted = totalQAs > 0 && submittedCount === totalQAs;
 
-  const isDark = false;
+  const handleToggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    localStorage.setItem('mom_dashboard_theme', nextTheme);
+    document.body.className = nextTheme === 'dark' ? 'dark-theme' : 'light-theme';
+  };
+
+  const isDark = theme === 'dark';
 
   return (
     <div className={`min-h-screen transition-colors duration-200 ${
@@ -461,6 +469,7 @@ export default function DashboardPage() {
         onOpenEmailModal={() => setIsEmailModalOpen(true)}
         onOpenRosterModal={() => setIsRosterModalOpen(true)}
         onResetData={handleResetData}
+        onToggleTheme={handleToggleTheme}
         isSaved={isSaved}
         theme={theme}
         allQAsSubmitted={allQAsSubmitted}
