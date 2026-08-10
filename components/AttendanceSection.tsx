@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { QATaskEntry, QA } from '@/lib/types';
 import { UserX, Plus, Trash2, ListOrdered, ChevronDown, ChevronUp, CheckCircle, Send, RefreshCw, UserCheck, ShieldAlert } from 'lucide-react';
-import confetti from 'canvas-confetti';
 
 interface AttendanceSectionProps {
   qaTasks: QATaskEntry[];
@@ -60,11 +59,6 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
   };
 
   const handleSubmit = (qaId: string) => {
-    confetti({
-      particleCount: 40,
-      spread: 50,
-      origin: { y: 0.7 },
-    });
     onSubmitQATask(qaId);
   };
 

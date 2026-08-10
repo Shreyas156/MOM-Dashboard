@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { DailyMOM, EmailSettings } from '@/lib/types';
 import { generateHTMLEmail, generatePlainTextEmail } from '@/lib/emailGenerator';
 import { X, Copy, Check, Send, Sparkles, FileText, Code, Mail, Settings2, Key, AlertCircle, ExternalLink } from 'lucide-react';
-import confetti from 'canvas-confetti';
 
 interface EmailModalProps {
   mom: DailyMOM;
@@ -75,12 +74,6 @@ export const EmailModal: React.FC<EmailModalProps> = ({
       }
       setCopiedHtml(true);
       setTimeout(() => setCopiedHtml(false), 2500);
-
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.8 },
-      });
     } catch (err) {
       navigator.clipboard.writeText(htmlContent);
       setCopiedHtml(true);
@@ -132,11 +125,6 @@ export const EmailModal: React.FC<EmailModalProps> = ({
 
       if (json.success) {
         setSendResult({ success: true, message: json.message });
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-        });
       } else {
         setSendResult({ success: false, message: json.error || 'Failed to send email' });
       }
