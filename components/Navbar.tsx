@@ -92,16 +92,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Roster</span>
           </button>
 
-          <button
-            onClick={onResetData}
-            className={`flex items-center gap-1 text-xs font-medium px-2.5 py-2 rounded-lg border transition-all ${
-              isDark ? 'text-slate-400 hover:text-slate-200 bg-slate-800/60 border-slate-700/60' : 'text-slate-600 hover:text-slate-900 bg-slate-100 border-slate-300'
-            }`}
-            title="Clear all fields for fresh entry"
-          >
-            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            <span>Clear Form</span>
-          </button>
 
           {/* SEND REPORT BUTTON - DISABLED UNTIL ALL QAS SUBMIT */}
           <button

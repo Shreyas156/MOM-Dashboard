@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { QATaskEntry, QA } from '@/lib/types';
-import { UserX, Plus, Trash2, ListOrdered, ChevronDown, ChevronUp, CheckCircle, Send, RefreshCw, UserCheck, ShieldAlert } from 'lucide-react';
+import { UserX, Plus, Trash2, ListOrdered, ChevronDown, ChevronUp, CheckCircle, Send, RefreshCw, UserCheck, ShieldAlert, RotateCcw } from 'lucide-react';
 
 interface AttendanceSectionProps {
   qaTasks: QATaskEntry[];
@@ -196,20 +196,44 @@ export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
                         </div>
                       </div>
 
-                      {/* MARK ON LEAVE BUTTON */}
-                      <button
-                        type="button"
-                        onClick={() => onUpdateQATask(entry.qaId, { isOnLeave: true })}
-                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${
-                          isDark
-                            ? 'bg-amber-950/40 hover:bg-amber-900/60 text-amber-400 border-amber-700/50'
-                            : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
-                        }`}
-                        title="Move to Absence / On Leave section"
-                      >
-                        <UserX className="w-3.5 h-3.5" />
-                        <span>Mark Leave</span>
-                      </button>
+                      {/* ACTION BUTTONS: CLEAR CARD & MARK LEAVE */}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewTaskTexts((prev) => ({ ...prev, [entry.qaId]: '' }));
+                            onUpdateQATask(entry.qaId, {
+                              status: '',
+                              tasks: [],
+                              isSubmitted: false,
+                              submittedAt: undefined,
+                            });
+                          }}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${
+                            isDark
+                              ? 'bg-slate-800/80 hover:bg-rose-950/50 text-slate-300 hover:text-rose-300 border-slate-700/80 hover:border-rose-700/50'
+                              : 'bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-700 border-slate-300 hover:border-rose-300 shadow-xs'
+                          }`}
+                          title={`Clear tasks and status for ${entry.qaName}`}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 text-rose-500" />
+                          <span>Clear Card</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => onUpdateQATask(entry.qaId, { isOnLeave: true })}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${
+                            isDark
+                              ? 'bg-amber-950/40 hover:bg-amber-900/60 text-amber-400 border-amber-700/50'
+                              : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                          }`}
+                          title="Move to Absence / On Leave section"
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                          <span>Mark Leave</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Status input */}
