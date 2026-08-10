@@ -224,11 +224,11 @@ export async function POST(req: NextRequest) {
       } catch (e) {}
     }
 
-    // 1. Save to Upstash Redis / Vercel KV with 7-day auto-expire (ex: 604800 seconds)
+    // 1. Save to Upstash Redis / Vercel KV with 48-hour auto-expire (ex: 172800 seconds)
     if (redis) {
       try {
-        // Auto-expires log after 7 days so free storage quota is never exceeded!
-        await redis.set(`mom:${date}`, finalMOMData, { ex: 7 * 24 * 60 * 60 });
+        // Auto-expires daily log after 48 hours so DB storage stays ultra-clean & 100% free forever!
+        await redis.set(`mom:${date}`, finalMOMData, { ex: 48 * 60 * 60 });
 
         if (Array.isArray(finalMOMData.smokeRows) && finalMOMData.smokeRows.length > 0) {
           await redis.set('smoke:master', finalMOMData.smokeRows);
