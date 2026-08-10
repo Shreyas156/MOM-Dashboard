@@ -23,7 +23,6 @@ import { EmailModal } from '@/components/EmailModal';
 import { RosterModal } from '@/components/RosterModal';
 import { DeploymentGuideModal } from '@/components/DeploymentGuideModal';
 import { Sparkles } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = useState<string>(getTodayDateString());
@@ -155,27 +154,6 @@ export default function DashboardPage() {
     };
   }, [currentDate]);
 
-  // 2. Real-time Supabase Cloud DB listener (Instant push updates across browsers)
-  useEffect(() => {
-    const client = supabase;
-    if (!client) return;
-    const channel = client
-      .channel(`mom-live-${currentDate}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'moms', filter: `id=eq.${currentDate}` },
-        (payload: any) => {
-          if (payload.new && payload.new.data) {
-            applyServerData(payload.new.data);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      client.removeChannel(channel);
-    };
-  }, [currentDate]);
 
   // 3. Fast 1.5s background polling fallback
   useEffect(() => {

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { redis } from '@/lib/kv';
+import { fetchMOMFromN8n, saveMOMToN8n } from '@/lib/n8n';
 import fs from 'fs';
 import path from 'path';
 
@@ -138,41 +137,19 @@ export async function GET(req: NextRequest) {
   const date = searchParams.get('date') || getTodayDateStringServer();
   const masterSmoke = getMasterSmokeRowsServer();
 
-  // 1. Try Upstash Redis / Vercel KV Cloud Store
-  if (redis) {
-    try {
-      const kvData = await redis.get<any>(`mom:${date}`);
-      if (kvData) {
-        if (masterSmoke && masterSmoke.length > 0) {
-          kvData.smokeRows = masterSmoke;
-        }
-        globalThis.momGlobalStore![date] = kvData;
-        return NextResponse.json({ success: true, data: kvData, source: 'upstash-redis' });
+  // 1. Try n8n Data Table / Webhook
+  try {
+    const n8nData = await fetchMOMFromN8n(date);
+    if (n8nData && n8nData.qaTasks) {
+      if (masterSmoke && masterSmoke.length > 0) {
+        n8nData.smokeRows = masterSmoke;
       }
-    } catch (e) {}
-  }
+      globalThis.momGlobalStore![date] = n8nData;
+      return NextResponse.json({ success: true, data: n8nData, source: 'n8n' });
+    }
+  } catch (e) {}
 
-  // 2. Try Supabase Cloud DB
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('moms')
-        .select('*')
-        .eq('id', date)
-        .single();
-
-      if (!error && data && data.data) {
-        const responseData = { ...data.data };
-        if (masterSmoke && masterSmoke.length > 0) {
-          responseData.smokeRows = masterSmoke;
-        }
-        globalThis.momGlobalStore![date] = responseData;
-        return NextResponse.json({ success: true, data: responseData, source: 'supabase' });
-      }
-    } catch (e) {}
-  }
-
-  // 3. Try Shared In-Memory Store
+  // 2. Try Shared In-Memory Store
   if (globalThis.momGlobalStore && globalThis.momGlobalStore[date]) {
     const responseData = { ...globalThis.momGlobalStore[date] };
     if (masterSmoke && masterSmoke.length > 0) {
@@ -185,7 +162,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // 4. Fallback to Local JSON File
+  // 3. Fallback to Local JSON File
   ensureDataFile();
   try {
     if (fs.existsSync(DATA_FILE)) {
@@ -220,27 +197,13 @@ export async function POST(req: NextRequest) {
 
     let existingData = globalThis.momGlobalStore[date] || null;
 
-    // Try fetching existing data from Upstash Redis / Vercel KV first
-    if (redis) {
-      try {
-        const kvData = await redis.get<any>(`mom:${date}`);
-        if (kvData) {
-          existingData = kvData;
-        }
-      } catch (e) {}
-    } else if (supabase) {
-      try {
-        const { data: dbData } = await supabase
-          .from('moms')
-          .select('*')
-          .eq('id', date)
-          .single();
-
-        if (dbData && dbData.data) {
-          existingData = dbData.data;
-        }
-      } catch (e) {}
-    }
+    // Try fetching existing data from n8n first for accurate merging
+    try {
+      const n8nData = await fetchMOMFromN8n(date);
+      if (n8nData && n8nData.qaTasks) {
+        existingData = n8nData;
+      }
+    } catch (e) {}
 
     const finalMOMData = mergeServerMOM(existingData, incomingData);
 
@@ -261,37 +224,12 @@ export async function POST(req: NextRequest) {
       } catch (e) {}
     }
 
-    // 1. Save to Upstash Redis / Vercel KV Cloud Store
-    if (redis) {
-      try {
-        await redis.set(`mom:${date}`, finalMOMData);
-        if (Array.isArray(finalMOMData.smokeRows) && finalMOMData.smokeRows.length > 0) {
-          await redis.set('smoke:master', finalMOMData.smokeRows);
-        }
-      } catch (e) {}
-    }
+    // 1. Save to n8n Webhook / Data Table
+    try {
+      await saveMOMToN8n(finalMOMData);
+    } catch (e) {}
 
-    // 2. Save to Supabase Cloud DB if keys are present
-    if (supabase) {
-      try {
-        await supabase.from('moms').upsert({
-          id: date,
-          date_formatted: finalMOMData.dateFormatted,
-          data: finalMOMData,
-          updated_at: finalMOMData.updatedAt,
-        });
-
-        if (Array.isArray(finalMOMData.smokeRows) && finalMOMData.smokeRows.length > 0) {
-          await supabase.from('smoke_reports').upsert({
-            id: 'master',
-            rows: finalMOMData.smokeRows,
-            updated_at: finalMOMData.updatedAt,
-          });
-        }
-      } catch (e) {}
-    }
-
-    // 3. Save to Local JSON File
+    // 2. Save to Local JSON File
     try {
       ensureDataFile();
       if (fs.existsSync(DATA_FILE)) {

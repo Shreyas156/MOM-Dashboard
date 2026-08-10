@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { redis } from '@/lib/kv';
+import { fetchSmokeRowsFromN8n, saveSmokeRowsToN8n } from '@/lib/n8n';
 import fs from 'fs';
 import path from 'path';
 
@@ -23,45 +22,21 @@ function ensureSmokeDataFile() {
 }
 
 export async function GET() {
-  // 1. Try Upstash Redis / Vercel KV
-  if (redis) {
-    try {
-      const rows = await redis.get<any[]>('smoke:master');
-      if (rows && Array.isArray(rows)) {
-        globalThis.masterSmokeRowsCache = rows;
-        return NextResponse.json({
-          success: true,
-          smokeRows: rows,
-          updatedAt: new Date().toISOString(),
-          source: 'upstash-redis',
-        });
-      }
-    } catch (e) {}
-  }
+  // 1. Try n8n Data Table / Webhook
+  try {
+    const n8nRows = await fetchSmokeRowsFromN8n();
+    if (n8nRows && Array.isArray(n8nRows)) {
+      globalThis.masterSmokeRowsCache = n8nRows;
+      return NextResponse.json({
+        success: true,
+        smokeRows: n8nRows,
+        updatedAt: new Date().toISOString(),
+        source: 'n8n',
+      });
+    }
+  } catch (e) {}
 
-  // 2. Try Supabase Cloud DB
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('smoke_reports')
-        .select('*')
-        .eq('id', 'master')
-        .single();
-
-      if (!error && data && data.rows) {
-        globalThis.masterSmokeRowsCache = data.rows;
-        globalThis.masterSmokeRowsUpdatedAt = data.updated_at;
-        return NextResponse.json({
-          success: true,
-          smokeRows: data.rows,
-          updatedAt: data.updated_at,
-          source: 'supabase',
-        });
-      }
-    } catch (e) {}
-  }
-
-  // 3. Try In-Memory Cache
+  // 2. Try In-Memory Cache
   if (globalThis.masterSmokeRowsCache && globalThis.masterSmokeRowsCache.length > 0) {
     return NextResponse.json({
       success: true,
@@ -71,7 +46,7 @@ export async function GET() {
     });
   }
 
-  // 4. Fallback to Local JSON File
+  // 3. Fallback to Local JSON File
   ensureSmokeDataFile();
   try {
     if (fs.existsSync(SMOKE_DATA_FILE)) {
@@ -106,23 +81,10 @@ export async function POST(req: NextRequest) {
     globalThis.masterSmokeRowsCache = smokeRows;
     globalThis.masterSmokeRowsUpdatedAt = updatedAt;
 
-    // 1. Save to Upstash Redis / Vercel KV
-    if (redis) {
-      try {
-        await redis.set('smoke:master', smokeRows);
-      } catch (e) {}
-    }
-
-    // 2. Save to Supabase Cloud DB
-    if (supabase) {
-      try {
-        await supabase.from('smoke_reports').upsert({
-          id: 'master',
-          rows: smokeRows,
-          updated_at: updatedAt,
-        });
-      } catch (e) {}
-    }
+    // 1. Save to n8n Webhook / Data Table
+    try {
+      await saveSmokeRowsToN8n(smokeRows);
+    } catch (e) {}
 
     // 2. Save to Local JSON File
     try {
