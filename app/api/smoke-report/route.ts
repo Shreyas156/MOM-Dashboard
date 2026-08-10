@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchSmokeRowsFromN8n, saveSmokeRowsToN8n } from '@/lib/n8n';
+import { getDatabase } from '@/lib/mongodb';
 import fs from 'fs';
 import path from 'path';
 
@@ -22,17 +22,21 @@ function ensureSmokeDataFile() {
 }
 
 export async function GET() {
-  // 1. Try n8n Data Table / Webhook
+  // 1. Try MongoDB Atlas
   try {
-    const n8nRows = await fetchSmokeRowsFromN8n();
-    if (n8nRows && Array.isArray(n8nRows)) {
-      globalThis.masterSmokeRowsCache = n8nRows;
-      return NextResponse.json({
-        success: true,
-        smokeRows: n8nRows,
-        updatedAt: new Date().toISOString(),
-        source: 'n8n',
-      });
+    const db = await getDatabase();
+    if (db) {
+      const doc = await db.collection('smoke_reports').findOne({ id: 'master' });
+      if (doc && doc.rows) {
+        globalThis.masterSmokeRowsCache = doc.rows;
+        globalThis.masterSmokeRowsUpdatedAt = doc.updatedAt;
+        return NextResponse.json({
+          success: true,
+          smokeRows: doc.rows,
+          updatedAt: doc.updatedAt,
+          source: 'mongodb',
+        });
+      }
     }
   } catch (e) {}
 
@@ -81,9 +85,16 @@ export async function POST(req: NextRequest) {
     globalThis.masterSmokeRowsCache = smokeRows;
     globalThis.masterSmokeRowsUpdatedAt = updatedAt;
 
-    // 1. Save to n8n Webhook / Data Table
+    // 1. Save to MongoDB Atlas
     try {
-      await saveSmokeRowsToN8n(smokeRows);
+      const db = await getDatabase();
+      if (db) {
+        await db.collection('smoke_reports').updateOne(
+          { id: 'master' },
+          { $set: { id: 'master', rows: smokeRows, updatedAt } },
+          { upsert: true }
+        );
+      }
     } catch (e) {}
 
     // 2. Save to Local JSON File

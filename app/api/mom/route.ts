@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchMOMFromN8n, saveMOMToN8n } from '@/lib/n8n';
+import { getDatabase } from '@/lib/mongodb';
 import fs from 'fs';
 import path from 'path';
 
@@ -69,11 +69,9 @@ function mergeServerMOM(existing: any, incoming: any): any {
       const extQA = existingQaMap.get(incQA.qaId);
       if (!extQA) return incQA;
 
-      // Retain submitted state if either has submitted it
       const isSubmitted = incQA.isSubmitted || extQA.isSubmitted;
       const submittedAt = incQA.submittedAt || extQA.submittedAt;
 
-      // Prefer non-empty tasks list
       let tasks = incQA.tasks;
       if (!tasks || tasks.length === 0) {
         tasks = extQA.tasks || [];
@@ -88,7 +86,6 @@ function mergeServerMOM(existing: any, incoming: any): any {
       };
     });
 
-    // Retain any QAs from existing that weren't in incoming
     existing.qaTasks.forEach((extQA: any) => {
       if (!merged.qaTasks.some((q: any) => q.qaId === extQA.qaId)) {
         merged.qaTasks.push(extQA);
@@ -96,7 +93,6 @@ function mergeServerMOM(existing: any, incoming: any): any {
     });
   }
 
-  // Merge smoke rows preserving filled values
   if (Array.isArray(incoming.smokeRows) && Array.isArray(existing.smokeRows)) {
     const existingSmokeMap = new Map<string, any>();
     existing.smokeRows.forEach((r: any) => existingSmokeMap.set(r.id, r));
@@ -137,15 +133,19 @@ export async function GET(req: NextRequest) {
   const date = searchParams.get('date') || getTodayDateStringServer();
   const masterSmoke = getMasterSmokeRowsServer();
 
-  // 1. Try n8n Data Table / Webhook
+  // 1. Try MongoDB Atlas
   try {
-    const n8nData = await fetchMOMFromN8n(date);
-    if (n8nData && n8nData.qaTasks) {
-      if (masterSmoke && masterSmoke.length > 0) {
-        n8nData.smokeRows = masterSmoke;
+    const db = await getDatabase();
+    if (db) {
+      const doc = await db.collection('moms').findOne({ id: date });
+      if (doc && doc.data) {
+        const responseData = { ...doc.data };
+        if (masterSmoke && masterSmoke.length > 0) {
+          responseData.smokeRows = masterSmoke;
+        }
+        globalThis.momGlobalStore![date] = responseData;
+        return NextResponse.json({ success: true, data: responseData, source: 'mongodb' });
       }
-      globalThis.momGlobalStore![date] = n8nData;
-      return NextResponse.json({ success: true, data: n8nData, source: 'n8n' });
     }
   } catch (e) {}
 
@@ -197,13 +197,16 @@ export async function POST(req: NextRequest) {
 
     let existingData = globalThis.momGlobalStore[date] || null;
 
-    // Try fetching existing data from n8n first for accurate merging
-    try {
-      const n8nData = await fetchMOMFromN8n(date);
-      if (n8nData && n8nData.qaTasks) {
-        existingData = n8nData;
-      }
-    } catch (e) {}
+    // Try fetching existing data from MongoDB Atlas for accurate merging
+    const db = await getDatabase();
+    if (db) {
+      try {
+        const doc = await db.collection('moms').findOne({ id: date });
+        if (doc && doc.data) {
+          existingData = doc.data;
+        }
+      } catch (e) {}
+    }
 
     const finalMOMData = mergeServerMOM(existingData, incomingData);
 
@@ -224,10 +227,32 @@ export async function POST(req: NextRequest) {
       } catch (e) {}
     }
 
-    // 1. Save to n8n Webhook / Data Table
-    try {
-      await saveMOMToN8n(finalMOMData);
-    } catch (e) {}
+    // 1. Save to MongoDB Atlas with auto-expire timestamp
+    if (db) {
+      try {
+        await db.collection('moms').updateOne(
+          { id: date },
+          {
+            $set: {
+              id: date,
+              dateFormatted: finalMOMData.dateFormatted,
+              data: finalMOMData,
+              updatedAt: finalMOMData.updatedAt,
+              createdAt: new Date(), // Auto-deleted after 7 days via TTL index
+            },
+          },
+          { upsert: true }
+        );
+
+        if (Array.isArray(finalMOMData.smokeRows) && finalMOMData.smokeRows.length > 0) {
+          await db.collection('smoke_reports').updateOne(
+            { id: 'master' },
+            { $set: { id: 'master', rows: finalMOMData.smokeRows, updatedAt: finalMOMData.updatedAt } },
+            { upsert: true }
+          );
+        }
+      } catch (e) {}
+    }
 
     // 2. Save to Local JSON File
     try {
